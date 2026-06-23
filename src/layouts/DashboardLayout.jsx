@@ -192,16 +192,6 @@ const DashboardLayout = ({ setHeaderTitle, headerTitle }) => {
                         {isSidebarOpen && <span className="font-bold text-[#172B4D] whitespace-nowrap">TMS</span>}
                     </div>
 
-                    {isSidebarOpen && (
-                        <button
-                            onClick={() => navigate('/dashboard/profile')}
-                            title="My Profile"
-                            className="mr-6 flex items-center justify-center w-7 h-7 rounded-lg text-[#5E6C84] hover:bg-[#EBECF0] hover:text-[#0052CC] transition cursor-pointer"
-                        >
-                            <FontAwesomeIcon icon={faUser} className="text-sm" />
-                        </button>
-                    )}
-
                     <button
                         onClick={toggleSidebar}
                         className="hidden lg:flex w-6 h-6 rounded bg-white border border-[#DFE1E6] items-center justify-center text-[#5E6C84] hover:bg-[#EBECF0] transition hover:text-[#172B4D] absolute -right-3 top-5 z-40 shadow-sm cursor-pointer"
