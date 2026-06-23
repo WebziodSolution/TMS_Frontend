@@ -1,0 +1,289 @@
+import React, { useMemo } from 'react';
+import { Controller } from 'react-hook-form';
+import {
+    FormControl,
+    Autocomplete,
+    TextField,
+    Checkbox,
+    Typography,
+    Box,
+} from '@mui/material';
+import { styled } from '@mui/material/styles';
+
+const OptionContainer = styled(Box)(({ theme, depth }) => ({
+    display: 'flex',
+    alignItems: 'center',
+    paddingLeft: depth * 24,
+    width: '100%',
+}));
+
+const HierarchySelect = ({ name, control, label, hierarchyData, rules, limitTags = 2, multiple = true, showDivider = true, dividerLabel = 'Other Members', ...props }) => {
+    // Flatten the tree and build lookup maps
+    const { flattenedOptions, nodeMap, parentMap, childrenMap } = useMemo(() => {
+        if (!hierarchyData || hierarchyData.length === 0) {
+            return { flattenedOptions: [], nodeMap: {}, parentMap: {}, childrenMap: {} };
+        }
+
+        const nodeMap = {};
+        const parentMap = {};
+        const childrenMap = {};
+        const flattened = [];
+
+        const traverse = (nodes, depth = 0, parentId = null, group = null) => {
+            nodes.forEach(node => {
+                const hasChildren = node.data && node.data.length > 0;
+                const nodeGroup = group === 'hierarchy' || hasChildren ? 'hierarchy' : 'isolated';
+
+                const flatNode = {
+                    id: node.id,
+                    name: node.name,
+                    depth,
+                    parentId,
+                    group: nodeGroup,
+                    hasChildren,
+                    selectable: node.selectable !== false, // default to true
+                };
+                flattened.push(flatNode);
+                nodeMap[node.id] = flatNode;
+                if (parentId !== null) {
+                    parentMap[node.id] = parentId;
+                }
+                if (hasChildren) {
+                    childrenMap[node.id] = node.data.map(c => c.id);
+                    traverse(node.data, depth + 1, node.id, nodeGroup);
+                } else {
+                    childrenMap[node.id] = [];
+                }
+            });
+        };
+
+        // Separate roots
+        const hierarchyRoots = hierarchyData.filter(root => root.data && root.data.length > 0);
+        const isolatedRoots = hierarchyData.filter(root => !root.data || root.data.length === 0);
+
+        traverse(hierarchyRoots, 0, null, 'hierarchy');
+
+        // Divider for "Other Members" (if any isolated roots exist)
+        if (showDivider && dividerLabel && isolatedRoots.length > 0) {
+            flattened.push({
+                id: 'divider-others',
+                name: dividerLabel,
+                disabled: true,
+                isDivider: true,
+                depth: 0,
+                selectable: false,
+            });
+        }
+
+        traverse(isolatedRoots, 0, null, 'isolated');
+
+        return { flattenedOptions: flattened, nodeMap, parentMap, childrenMap };
+    }, [hierarchyData]);
+
+    const getAncestors = (nodeId) => {
+        const ancestors = new Set();
+        let current = nodeId;
+        while (current) {
+            ancestors.add(current);
+            current = parentMap[current] || null;
+        }
+        return ancestors;
+    };
+
+    const getDescendants = (nodeId) => {
+        const descendants = new Set();
+        const stack = [nodeId];
+        while (stack.length) {
+            const id = stack.pop();
+            descendants.add(id);
+            const children = childrenMap[id] || [];
+            children.forEach(child => stack.push(child));
+        }
+        return descendants;
+    };
+
+    const hasAnySelectedDescendant = (nodeId, selectionSet) => {
+        const descendants = getDescendants(nodeId);
+        // Exclude the node itself to check if ANY children/sub-children are selected
+        descendants.delete(nodeId);
+        for (const id of descendants) {
+            if (selectionSet.has(id)) return true;
+        }
+        return false;
+    };
+
+    const applyHierarchyRemoval = (selectionSet, nodeId) => {
+        // 1. Remove node and all descendants
+        const toRemove = getDescendants(nodeId);
+        toRemove.forEach(id => selectionSet.delete(id));
+
+        // 2. Climb up and remove ancestors if they no longer have selected descendants
+        let currentParentId = parentMap[nodeId];
+        while (currentParentId) {
+            if (!hasAnySelectedDescendant(currentParentId, selectionSet)) {
+                selectionSet.delete(currentParentId);
+                currentParentId = parentMap[currentParentId];
+            } else {
+                break; // Ancestor still has other selected descendants
+            }
+        }
+    };
+
+    const computeExpandedSelection = (selectedIds) => {
+        const expanded = new Set();
+        selectedIds.forEach(id => {
+            getAncestors(id).forEach(aid => expanded.add(aid));
+        });
+        return expanded;
+    };
+
+    // Filter out any IDs that are not selectable (useful after toggling)
+    const filterSelectable = (ids) => ids.filter(id => nodeMap[id]?.selectable !== false);
+
+    return (
+        <Controller
+            name={name}
+            control={control}
+            rules={rules}
+            render={({ field: { onChange, value }, fieldState: { error } }) => {
+                const selectedIds = multiple ? (value || []) : (value ? [value] : []);
+                const expandedSelection = useMemo(
+                    () => computeExpandedSelection(selectedIds),
+                    [selectedIds, parentMap]
+                );
+
+                const selectedOption = useMemo(() => {
+                    if (multiple) {
+                        return flattenedOptions.filter(opt => !opt.isDivider && selectedIds.includes(opt.id));
+                    } else {
+                        return flattenedOptions.find(opt => !opt.isDivider && opt.id === value) || null;
+                    }
+                }, [value, flattenedOptions, multiple, selectedIds]);
+
+                const filterOptions = (options, state) => {
+                    return options.filter(opt => {
+                        if (opt.isDivider) return true;
+                        return opt.name.toLowerCase().includes(state.inputValue.toLowerCase());
+                    });
+                };
+
+                const handleToggle = (nodeId) => {
+                    let newSelection = new Set(selectedIds);
+                    if (expandedSelection.has(nodeId)) {
+                        // Uncheck logic: remove node, descendants, and potentially ancestors
+                        applyHierarchyRemoval(newSelection, nodeId);
+                    } else {
+                        // Check logic: add node and all ancestors
+                        const toAdd = getAncestors(nodeId);
+                        toAdd.forEach(id => newSelection.add(id));
+                    }
+                    // Remove non‑selectable IDs before saving
+                    const filtered = filterSelectable(Array.from(newSelection));
+                    onChange(filtered);
+                };
+
+                const handleAutocompleteChange = (event, newValue, reason) => {
+                    if (multiple) {
+                        if (reason === 'clear') {
+                            onChange([]);
+                        } else if (reason === 'removeOption') {
+                            const newIds = newValue.map(opt => opt.id);
+                            const removedIds = selectedIds.filter(id => !newIds.includes(id));
+                            if (removedIds.length > 0) {
+                                let newSelection = new Set(selectedIds);
+                                removedIds.forEach(id => {
+                                    applyHierarchyRemoval(newSelection, id);
+                                });
+                                const filtered = filterSelectable(Array.from(newSelection));
+                                onChange(filtered);
+                            }
+                        }
+                    } else {
+                        if (reason === 'clear') {
+                            onChange(null);
+                        } else {
+                            onChange(newValue ? newValue.id : null);
+                        }
+                    }
+                };
+
+                return (
+                    <FormControl fullWidth error={!!error} {...props}>
+                        <Autocomplete
+                            multiple={multiple}
+                            size="small"
+                            disableCloseOnSelect={multiple}
+                            options={flattenedOptions}
+                            getOptionLabel={(option) => option.name || ''}
+                            isOptionEqualToValue={(option, val) => option.id === val.id}
+                            getOptionDisabled={(option) => option.selectable === false || option.isDivider}
+                            filterOptions={filterOptions}
+                            value={selectedOption}
+                            onChange={handleAutocompleteChange}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label={label}
+                                    variant="outlined"
+                                    size="small"
+                                    error={!!error}
+                                // helperText={error ? error.message : null}
+                                />
+                            )}
+                            renderOption={(props, option) => {
+                                if (option.isDivider) {
+                                    return (
+                                        <li {...props} style={{ pointerEvents: 'none', opacity: 0.8 }}>
+                                            <Typography variant="subtitle2" color="textSecondary" fontWeight="bold">
+                                                {option.name}
+                                            </Typography>
+                                        </li>
+                                    );
+                                }
+                                const { key, ...liProps } = props;
+                                return (
+                                    <li
+                                        key={option.id}
+                                        {...liProps}
+                                        onClick={(e) => {
+                                            if (multiple) {
+                                                if (option.selectable) {
+                                                    handleToggle(option.id);
+                                                }
+                                            } else {
+                                                if (liProps.onClick) {
+                                                    liProps.onClick(e);
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        <OptionContainer depth={option.depth}>
+                                            {multiple && option.selectable && (
+                                                <Checkbox
+                                                    checked={expandedSelection.has(option.id)}
+                                                    onChange={() => handleToggle(option.id)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    size="small"
+                                                />
+                                            )}
+                                            <Typography
+                                                variant="body2"
+                                                fontWeight={option.hasChildren ? 'bold' : 'normal'}
+                                            >
+                                                {option.name}
+                                            </Typography>
+                                        </OptionContainer>
+                                    </li>
+                                );
+                            }}
+                            ListboxProps={{ style: { maxHeight: 300 } }}
+                            limitTags={limitTags === 0 ? -1 : limitTags}
+                        />
+                    </FormControl>
+                );
+            }}
+        />
+    );
+};
+
+export default HierarchySelect;

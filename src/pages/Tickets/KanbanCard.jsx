@@ -1,0 +1,415 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Draggable } from '@hello-pangea/dnd';
+import { Box, Typography, IconButton, Tooltip, Avatar, AvatarGroup } from '@mui/material';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEdit, faExclamationTriangle, faCalendarAlt, faCheckSquare, faTrash, faClose, faRotateLeft } from '@fortawesome/free-solid-svg-icons';
+import dayjs from 'dayjs';
+import InlineEdit from '../../components/common/InlineEdit';
+import TicketFormModal from './TicketFormModal';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { connect } from 'react-redux';
+import { setAlert } from '../../redux/commonReducers/commonReducers';
+import { deleteTicket, closeOrReopenTicket } from '../../services/ticketService';
+import PermissionWrapper from '../../components/permissionWrapper/PermissionWrapper';
+import { getUserDetails } from '../../utils/getUserDetails';
+import { useForm } from 'react-hook-form';
+import { getAllStatuses } from '../../services/statusService';
+import CustomSelect from '../../components/common/CustomSelect';
+
+const getTicketTypeColor = (type) => {
+    const t = type?.toLowerCase() || '';
+    if (t.includes('bug')) {
+        return { bg: '#FFEBE6', text: '#BF2600' };
+    }
+    if (t.includes('feature')) {
+        return { bg: '#E6FCFF', text: '#00657F' };
+    }
+    if (t.includes('redevelopment')) {
+        return { bg: '#EAE6FF', text: '#403294' };
+    }
+    return { bg: '#F4F5F7', text: '#5E6C84' };
+};
+
+const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert }) => {
+    const userData = getUserDetails();
+    const navigate = useNavigate();
+    const [isEditing, setIsEditing] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
+    const [openDialog, setOpenDialog] = useState(false);
+    const [editingTicketId, setEditingTicketId] = useState(null);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState({ open: false, ticket: null });
+
+    const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+    const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+    const [statuses, setStatuses] = useState([]);
+
+    const { control, watch, setValue } = useForm({
+        defaultValues: {
+            reopen_status_id: ''
+        }
+    });
+
+    const handleCloseTicket = async () => {
+        try {
+            await closeOrReopenTicket(ticket.id, null);
+            setAlert({ open: true, message: "Ticket closed successfully!", type: "success" });
+            fetchTickets();
+            setCloseConfirmOpen(false);
+        } catch (err) {
+            setAlert({ open: true, message: err.message || "Failed to close ticket.", type: "error" });
+        }
+    };
+
+    const handleReopenTicket = async () => {
+        const statusId = watch('reopen_status_id');
+        if (!statusId) {
+            setAlert({ open: true, message: "Please select a status to reopen.", type: "warning" });
+            return;
+        }
+        try {
+            await closeOrReopenTicket(ticket.id, statusId);
+            setAlert({ open: true, message: "Ticket reopened successfully!", type: "success" });
+            fetchTickets();
+            setReopenDialogOpen(false);
+            setValue('reopen_status_id', '');
+        } catch (err) {
+            setAlert({ open: true, message: err.message || "Failed to reopen ticket.", type: "error" });
+        }
+    };
+
+    const openReopenDialogHandler = async (e) => {
+        e.stopPropagation();
+        setReopenDialogOpen(true);
+        try {
+            const res = await getAllStatuses();
+            if (res.status === 200) {
+                const list = res.result
+                    ?.filter(s => s.name?.toLowerCase() !== 'close')
+                    ?.map(s => ({ value: s.id, label: s.name })) || [];
+                setStatuses(list);
+            }
+        } catch (err) {
+            console.error("Failed to load statuses", err);
+        }
+    };
+
+    // Safe due date validation
+    const isValidDueDate = ticket.due_date && dayjs(ticket.due_date).isValid();
+    const isOverdue = isValidDueDate &&
+        dayjs(ticket.due_date).isBefore(dayjs(), 'day') &&
+        ticket.status_name?.toLowerCase() !== 'done';
+
+    const handleSaveTitle = (newTitle) => {
+        onUpdateTitle(ticket.id, newTitle);
+        setIsEditing(false);
+    };
+
+    const formatDate = (date) => {
+        if (!date || !dayjs(date).isValid()) return '';
+        return dayjs(date).format('MMM D, YYYY');
+    };
+
+    const handleOpen = (ticketId) => {
+        setEditingTicketId(ticketId);
+        setOpenDialog(true);
+    };
+
+    const handleClose = () => {
+        setOpenDialog(false);
+        setEditingTicketId(null);
+    };
+
+    const openDeleteConfirm = (ticket) => {
+        setDeleteConfirmOpen({ open: true, ticket });
+    };
+
+    const handleDelete = async () => {
+        const id = deleteConfirmOpen.ticket?.id;
+        if (!id) return;
+        try {
+            await deleteTicket(id);
+            fetchTickets();
+            setDeleteConfirmOpen({ open: false, ticket: null });
+        } catch (err) {
+            setAlert({ open: true, message: err.message || "Failed to delete ticket.", type: "error" });
+        }
+    };
+
+    return (
+        <>
+            <Draggable draggableId={String(ticket.id)} index={index}>
+                {(provided, snapshot) => (
+                    <Box
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        onMouseEnter={() => setIsHovered(true)}
+                        onMouseLeave={() => setIsHovered(false)}
+                        onClick={() => {
+                            navigate(`/dashboard/manage-tickets/view/${ticket.id}`);
+                        }}
+                        sx={{
+                            backgroundColor: snapshot.isDragging ? '#f4f5f7' : 'white',
+                            borderRadius: '4px',
+                            padding: '12px',
+                            marginBottom: '8px',
+                            boxShadow: snapshot.isDragging
+                                ? '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)'
+                                : '0 1px 2px rgba(9, 30, 66, 0.25)',
+                            border: isOverdue ? '2px solid #FF5630' : '1px solid #dfe1e6',
+                            transition: 'all 0.2s ease',
+                            position: 'relative',
+                            '&:hover': {
+                                backgroundColor: '#f4f5f7',
+                            },
+                            cursor: "pointer"
+                        }}
+                    >
+                        {isEditing ? (
+                            <InlineEdit
+                                initialValue={ticket.title}
+                                onSave={handleSaveTitle}
+                                onCancel={() => setIsEditing(false)}
+                            />
+                        ) : (
+                            <Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                    <Typography
+                                        variant="subtitle2"
+                                        sx={{
+                                            fontWeight: 500,
+                                            color: '#172B4D',
+                                            fontSize: '14px',
+                                            lineHeight: '20px',
+                                            pr: 3,
+                                            wordBreak: 'break-word',
+                                            flex: 1
+                                        }}
+                                    >
+                                        {ticket.title}
+                                    </Typography>
+                                    {isHovered && (
+                                        <Box
+                                            onClick={(e) => e.stopPropagation()}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            sx={{ position: 'absolute', right: 8, top: 12, display: 'flex', gap: 0.5 }}
+                                        >
+                                            <PermissionWrapper
+                                                functionalityName="manage tickets"
+                                                moduleName="Tickets"
+                                                actionId={3}
+                                                component={
+                                                    ticket.status_name?.toLowerCase() === 'close' ? (
+                                                        <Tooltip title="Reopen Ticket" arrow placement='bottom'>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={openReopenDialogHandler}
+                                                                sx={{ padding: '4px', color: '#36B37E' }}
+                                                            >
+                                                                <FontAwesomeIcon icon={faRotateLeft} size="xs" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    ) : (
+                                                        <Tooltip title="Close Ticket" arrow placement='bottom'>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setCloseConfirmOpen(true);
+                                                                }}
+                                                                sx={{ padding: '4px', color: '#DE350B' }}
+                                                            >
+                                                                <FontAwesomeIcon icon={faClose} size="xs" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )
+                                                }
+                                            />
+                                        </Box>
+                                    )}
+                                </Box>
+
+                                {/* Bottom row with ticket ID, due date, and assignees - now with flex wrap for better responsiveness */}
+                                <Box sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    mt: 1,
+                                    flexWrap: 'wrap',
+                                    gap: 1,
+                                    rowGap: 1
+                                }}>
+                                    <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        width: '100%'
+                                    }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <FontAwesomeIcon icon={faCheckSquare} size="xs" color="#4C9AFF" />
+                                            <Typography variant="caption" sx={{ color: '#6B778C', fontWeight: 600 }}>
+                                                {ticket.ticket_no}
+                                            </Typography>
+                                        </Box>
+                                        {ticket.type && (
+                                            <span style={{
+                                                fontSize: '10px',
+                                                fontWeight: 'bold',
+                                                textTransform: 'uppercase',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                                backgroundColor: getTicketTypeColor(ticket.type).bg,
+                                                color: getTicketTypeColor(ticket.type).text,
+                                                lineHeight: '1',
+                                                display: 'inline-block',
+                                            }}>
+                                                {ticket.type}
+                                            </span>
+                                        )}
+                                    </Box>
+
+                                    {/* Due date and assignees container with wrapping support */}
+                                    <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                        flexWrap: 'wrap',
+                                        justifyContent: 'flex-end',
+                                        flex: '1 1 auto',
+                                        minWidth: 0
+                                    }}>
+                                        {/* Due date display with validation and proper styling */}
+                                        {ticket.due_date && dayjs(ticket.due_date).isValid() && (
+                                            <Box
+                                                sx={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.5,
+                                                    padding: '2px 6px',
+                                                    borderRadius: '3px',
+                                                    backgroundColor: isOverdue ? '#FFEBE6' : 'transparent',
+                                                    color: isOverdue ? '#BF2600' : '#6B778C',
+                                                    border: isOverdue ? '1px solid #FF5630' : 'none',
+                                                    whiteSpace: 'nowrap',
+                                                    flexShrink: 0
+                                                }}
+                                            >
+                                                {isOverdue && <FontAwesomeIcon icon={faExclamationTriangle} size="xs" />}
+                                                <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '11px' }}>
+                                                    {formatDate(ticket.due_date)}
+                                                </Typography>
+                                            </Box>
+                                        )}
+
+                                        {/* Fallback when no due date exists (optional) */}
+                                        {(!ticket.due_date || !dayjs(ticket.due_date).isValid()) && (
+                                            <Box
+                                                sx={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.5,
+                                                    padding: '2px 6px',
+                                                    borderRadius: '3px',
+                                                    backgroundColor: '#F4F5F7',
+                                                    color: '#6B778C',
+                                                    whiteSpace: 'nowrap',
+                                                    flexShrink: 0
+                                                }}
+                                            >
+                                                <FontAwesomeIcon icon={faCalendarAlt} size="xs" />
+                                                <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '11px' }}>
+                                                    No due date
+                                                </Typography>
+                                            </Box>
+                                        )}
+
+                                        {/* Assignees */}
+                                        {ticket.assignees?.length > 0 && (
+                                            <AvatarGroup max={2} sx={{
+                                                flexShrink: 0,
+                                                '& .MuiAvatar-root': {
+                                                    width: 24,
+                                                    height: 24,
+                                                    fontSize: '10px',
+                                                    border: '2px solid white'
+                                                }
+                                            }}>
+                                                {ticket.assignees.map((user, idx) => (
+                                                    <Tooltip key={idx} title={user.name}>
+                                                        <Avatar
+                                                            alt={user.name}
+                                                            sx={{ bgcolor: '#00A3BF' }}
+                                                        >
+                                                            {user.name.charAt(0).toUpperCase()}
+                                                        </Avatar>
+                                                    </Tooltip>
+                                                ))}
+                                            </AvatarGroup>
+                                        )}
+                                    </Box>
+                                </Box>
+                            </Box>
+                        )}
+                    </Box>
+                )}
+            </Draggable>
+            <TicketFormModal
+                open={openDialog}
+                onClose={handleClose}
+                onSuccess={() => {
+                    fetchTickets();
+                    handleClose();
+                }}
+                editingTicketId={editingTicketId}
+            />
+            <ConfirmDialog
+                open={deleteConfirmOpen.open}
+                onClose={() => setDeleteConfirmOpen({ open: false, ticket: null })}
+                onConfirm={handleDelete}
+                title="Delete Ticket"
+                description={`Are you sure you want to delete "${deleteConfirmOpen.ticket?.title}"? `}
+                confirmText="Delete"
+                isDestructive={true}
+            />
+            <ConfirmDialog
+                open={closeConfirmOpen}
+                onClose={() => setCloseConfirmOpen(false)}
+                onConfirm={handleCloseTicket}
+                title="Close Ticket"
+                description={`Are you sure you want to close "${ticket.title}"?`}
+                confirmText="Close Ticket"
+                isDestructive={true}
+            />
+            <ConfirmDialog
+                open={reopenDialogOpen}
+                onClose={() => {
+                    setReopenDialogOpen(false);
+                    setValue('reopen_status_id', '');
+                }}
+                onConfirm={handleReopenTicket}
+                title="Reopen Ticket"
+                description={`Select a new status to reopen "${ticket.title}":`}
+                confirmText="Reopen"
+            >
+                <div className="mt-4">
+                    <CustomSelect
+                        name="reopen_status_id"
+                        control={control}
+                        label="Select Status"
+                        options={statuses?.reverse()}
+                        rules={{ required: "Status is required to reopen" }}
+                    />
+                </div>
+            </ConfirmDialog>
+        </>
+    );
+};
+
+const mapStateToProps = (state) => ({});
+
+const mapDispatchToProps = {
+    setAlert
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(KanbanCard);

@@ -1,0 +1,418 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faBars,
+    faTimes,
+    faBuilding,
+    faTasks,
+    faInfoCircle,
+    faTicketAlt,
+    faUsers,
+    faSignOutAlt,
+    faQuestionCircle,
+    faBell,
+    faChartPie,
+    faAngleLeft,
+    faUserShield,
+    faUser,
+    faCog,
+    faWallet,
+    faTag,
+    faChartLine,
+    faClock
+} from '@fortawesome/free-solid-svg-icons';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import { getNavigationMenu } from '../services/systemService';
+import { CircularProgress } from '@mui/material';
+import { getUserDetails } from '../utils/getUserDetails';
+import PermissionWrapper from '../components/permissionWrapper/PermissionWrapper';
+import { headerTitles, matchRoute } from '../utils/headerTitles';
+import { connect } from 'react-redux';
+import { setHeaderTitle } from '../redux/commonReducers/commonReducers';
+import { getCookie, removeCookie } from '../utils/cookieHelper';
+
+const iconMap = {
+    "Dashboard": faChartPie,
+    "Work Log": faClock,
+    "Manage Department": faBuilding,
+    "Manage Project": faTasks,
+    "Manage Ticket Status": faInfoCircle,
+    "Manage Tickets": faTicketAlt,
+    "Manage User": faUsers,
+    "Manage Role": faUserShield,
+    "Manage Company": faBuilding,
+    "Manage Reports": faChartLine,
+    "Daily Report": faChartLine,
+    "Monthly Report": faChartLine
+};
+
+const DashboardLayout = ({ setHeaderTitle, headerTitle }) => {
+    const userDetails = getUserDetails();
+
+    const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const [isMobileOpen, setMobileOpen] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+    const [menuItems, setMenuItems] = useState([]);
+    const [loadingMenu, setLoadingMenu] = useState(true);
+    const [isProfileOpen, setProfileOpen] = useState(false);
+
+    const navigate = useNavigate();
+    const locaiton = useLocation()
+    const currentPath = locaiton?.pathname
+
+    const profileButtonRef = useRef(null);
+    const profileMenuRef = useRef(null);
+
+    const userFullName = `${userDetails?.firstName || ''} ${userDetails?.lastName || ''}`.trim() || 'User';
+    const userRole = userDetails?.rolename || userDetails?.roleName || userDetails?.role || 'Unknown role';
+    const toggleProfileMenu = () => setProfileOpen((prev) => !prev);
+
+    const profileActions = [
+        { id: 'profile', title: 'My Profile', icon: faUser },
+    ];
+
+    useEffect(() => {
+        if (!isProfileOpen) return;
+
+        const handleOutsideClick = (event) => {
+            if (
+                profileMenuRef.current &&
+                !profileMenuRef.current.contains(event.target) &&
+                profileButtonRef.current &&
+                !profileButtonRef.current.contains(event.target)
+            ) {
+                setProfileOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleOutsideClick);
+        return () => document.removeEventListener('mousedown', handleOutsideClick);
+    }, [isProfileOpen]);
+
+    const handleProfileAction = (actionId) => {
+        setProfileOpen(false);
+        switch (actionId) {
+            case 'profile':
+                navigate('/dashboard/profile');
+                break;
+            case 'settings':
+                navigate('/dashboard/settings');
+                break;
+            case 'billing':
+                navigate('/dashboard/billing');
+                break;
+            case 'pricing':
+                navigate('/dashboard/pricing');
+                break;
+            case 'faq':
+                navigate('/dashboard/faq');
+                break;
+            default:
+                break;
+        }
+    };
+
+    useEffect(() => {
+        const matched = headerTitles?.find((h) =>
+            matchRoute(h.path, currentPath)
+        )
+
+        if (matched) {
+            setHeaderTitle(matched.title)
+        }
+    }, [currentPath])
+
+    useEffect(() => {
+        const fetchNavigation = async () => {
+            try {
+                // We will decode the email from JWT manually or just fetch
+                const token = getCookie('tms_token');
+                if (!token) {
+                    navigate('/');
+                    return;
+                }
+
+                // Simulating decoding token to get email, since our backend needs user_email.
+                // In real JWT, token parts are separated by dot
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+
+                const payload = JSON.parse(jsonPayload);
+                const email = payload.sub;
+
+                const res = await getNavigationMenu(email);
+                setMenuItems(res.result.menu);
+            } catch (err) {
+                console.error("Failed to load navigation", err);
+                // Fallback or error handling
+            } finally {
+                setLoadingMenu(false);
+            }
+        };
+        fetchNavigation();
+    }, [navigate]);
+
+    const handleLogout = () => {
+        removeCookie('tms_token');
+        removeCookie('tms_user');
+        navigate('/');
+    };
+
+    const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
+    const toggleMobileSidebar = () => setMobileOpen(!isMobileOpen);
+    return (
+        <div className="flex h-screen bg-[#FAFBFC] overflow-hidden text-[#172B4D]">
+
+            {/* Mobile Sidebar Overlay */}
+            {isMobileOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+                    onClick={toggleMobileSidebar}
+                />
+            )}
+
+            {/* Sidebar Architecture */}
+            <aside
+                className={`fixed inset-y-0 left-0 z-30 bg-white border-r border-[#DFE1E6] transform transition-all duration-300 ease-in-out lg:relative 
+          ${isSidebarOpen ? 'w-72' : 'w-20'} 
+          ${isMobileOpen ? 'translate-x-0 w-72' : '-translate-x-full lg:translate-x-0'}
+          flex flex-col shadow-[2px_0_8px_rgba(0,0,0,0.05)]
+        `}
+            >
+                <div className="h-16 flex items-center justify-between px-4 border-b border-[#DFE1E6] bg-[#FAFBFC]">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                        <div className="w-8 h-8 rounded bg-[#0052CC] text-white flex items-center justify-center font-bold text-lg shrink-0">
+                            T
+                        </div>
+                        {isSidebarOpen && <span className="font-bold text-[#172B4D] whitespace-nowrap">TMS</span>}
+                    </div>
+
+                    {isSidebarOpen && (
+                        <button
+                            onClick={() => navigate('/dashboard/profile')}
+                            title="My Profile"
+                            className="mr-6 flex items-center justify-center w-7 h-7 rounded-lg text-[#5E6C84] hover:bg-[#EBECF0] hover:text-[#0052CC] transition cursor-pointer"
+                        >
+                            <FontAwesomeIcon icon={faUser} className="text-sm" />
+                        </button>
+                    )}
+
+                    <button
+                        onClick={toggleSidebar}
+                        className="hidden lg:flex w-6 h-6 rounded bg-white border border-[#DFE1E6] items-center justify-center text-[#5E6C84] hover:bg-[#EBECF0] transition hover:text-[#172B4D] absolute -right-3 top-5 z-40 shadow-sm cursor-pointer"
+                    >
+                        <FontAwesomeIcon icon={isSidebarOpen ? faAngleLeft : faBars} className="text-xs" />
+                    </button>
+                </div>
+
+
+                {/* Sidebar Menu Iteration (Based on Backend Array) */}
+                <div className="flex-1 overflow-y-auto py-6 px-3 custom-scrollbar">
+                    {loadingMenu ? (
+                        <div className="flex justify-center my-10">
+                            <CircularProgress size={24} sx={{ color: '#0052CC' }} />
+                        </div>
+                    ) : (
+                        <nav className="space-y-4">
+                            {menuItems?.map((section, idx) => (
+                                <div key={idx}>
+                                    {section.partition && isSidebarOpen && (
+                                        <h3 className="px-4 text-xs font-bold text-[#8993A4] uppercase tracking-wider mb-2 mt-2">
+                                            {section.partition}
+                                        </h3>
+                                    )}
+                                    {section.partition && !isSidebarOpen && (
+                                        <div className="border-t border-[#DFE1E6] my-3 mx-4"></div>
+                                    )}
+
+                                    <div className="space-y-1">
+                                        {section?.items?.map((item) => {
+                                            const isDashboard = item.title === "Dashboard" || !item.permission;
+                                            const displayTitle = (item?.permission?.functionality_name === "manage reports" && item?.permission?.module_name)
+                                                ? item.permission.module_name
+                                                : item.title;
+                                            const navLink = (
+                                                <NavLink
+                                                    to={`/dashboard${item.path}`}
+                                                    end={item.path === ""}
+                                                    className={({ isActive }) => `
+                                                         flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 group
+                                                         ${isActive
+                                                            ? 'bg-linear-to-r from-[#E9F2FF] to-transparent text-[#0052CC] font-semibold border-l-4 border-[#0052CC]'
+                                                            : 'text-[#42526E] hover:bg-[#EBECF0] hover:text-[#172B4D] border-l-4 border-transparent'}
+                                                     `}
+                                                    title={!isSidebarOpen ? displayTitle : ""}
+                                                >
+                                                    {({ isActive }) => (
+                                                        <>
+                                                            <div className="flex items-center justify-center w-6 shrink-0">
+                                                                <FontAwesomeIcon
+                                                                    icon={iconMap[displayTitle] || iconMap[item.title] || faQuestionCircle}
+                                                                    className={isActive ? 'text-[#0052CC]' : 'text-[#6B778C] group-hover:text-[#42526E]'}
+                                                                />
+                                                            </div>
+
+                                                            {isSidebarOpen && (
+                                                                <span className="truncate whitespace-nowrap overflow-hidden">
+                                                                    {displayTitle}
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </NavLink>
+                                            );
+
+                                            return (
+                                                <div key={item.id}>
+                                                    {isDashboard ? (
+                                                        navLink
+                                                    ) : (
+                                                        <PermissionWrapper
+                                                            functionalityName={item?.permission?.functionality_name}
+                                                            moduleName={item?.permission?.module_name}
+                                                            actionId={item?.permission?.actions[0]}
+                                                            component={navLink}
+                                                        />
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </nav>
+                    )}
+                </div>
+
+                {/* Sidebar Footer (Logout) */}
+                <div className="p-4 border-t border-[#DFE1E6] bg-white">
+                    <button
+                        onClick={() => setShowLogoutConfirm(true)}
+                        className={`flex items-center w-full gap-3 px-3 py-3 rounded-xl text-[#DE350B] hover:bg-[#FFEBE6] transition-all duration-200 group border-l-4 border-transparent hover:border-[#DE350B] cursor-pointer`}
+                        title={!isSidebarOpen ? "Log Out" : ""}
+                    >
+                        <div className="flex items-center justify-center w-6 shrink-0 group-hover:scale-110 transition-transform">
+                            <FontAwesomeIcon icon={faSignOutAlt} />
+                        </div>
+                        {isSidebarOpen && <span className="font-semibold whitespace-nowrap">Log Out</span>}
+                    </button>
+                </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col min-w-0">
+
+                {/* Top Navbar */}
+                <header className="h-16 bg-white border-b border-[#DFE1E6] shadow-sm items-center justify-between px-4 lg:px-8 z-10 hidden lg:flex">
+                    <div>
+                        <h1 className="font-bold text-[#172B4D] whitespace-nowrap text-xl">{headerTitle}</h1>
+                    </div>
+                    <div className="flex items-center gap-5 relative">
+                        {/* <button className="relative p-2 text-[#5E6C84] hover:text-[#172B4D] hover:bg-[#EBECF0] rounded-full transition-colors cursor-pointer">
+                            <FontAwesomeIcon icon={faBell} size="lg" />
+                            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#DE350B] rounded-full border-2 border-white"></span>
+                        </button> */}
+                        <button
+                            type="button"
+                            ref={profileButtonRef}
+                            onClick={toggleProfileMenu}
+                            className="w-9 h-9 rounded-full bg-linear-to-br from-[#0052CC] to-[#4C9AFF] text-white flex items-center justify-center font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all ring-2 ring-white cursor-pointer"
+                        >
+                            {userDetails ? `${userDetails?.firstName.split(" ")[0][0] || ''}${userDetails?.lastName.split(" ")[0][0] || ''}` : 'U'}
+                        </button>
+
+                        {isProfileOpen && (
+                            <div
+                                ref={profileMenuRef}
+                                className="absolute right-0 top-14 w-72 z-50 overflow-hidden rounded-2xl border border-[#DFE1E6] bg-white shadow-[0_30px_80px_rgba(23,42,91,0.12)]"
+                            >
+                                <div className="flex items-center gap-3 border-b border-[#F4F5F7] px-4 py-4 bg-[#F8FAFC]">
+                                    <div className="relative">
+                                        <div className="w-12 h-12 rounded-full bg-[#E8F0FE] text-[#0052CC] flex items-center justify-center font-bold text-lg">
+                                            {userDetails ? `${userDetails?.firstName.split(" ")[0][0] || ''}${userDetails?.lastName.split(" ")[0][0] || ''}` : 'U'}
+                                        </div>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-[#172B4D] truncate">{userFullName}</p>
+                                        <p className="text-xs text-[#6B778C] truncate">{userRole}</p>
+                                    </div>
+                                </div>
+
+                                <div className="divide-y divide-[#F4F5F7] px-2 py-2">
+                                    {profileActions.slice(0, 1).map((item) => (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => handleProfileAction(item.id)}
+                                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm text-[#172B4D] transition hover:bg-[#F4F5F7] cursor-pointer"
+                                        >
+                                            <FontAwesomeIcon icon={item.icon} className="text-[#5E6C84] w-4" />
+                                            <span>{item.title}</span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="border-t border-[#F4F5F7] px-4 py-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setProfileOpen(false);
+                                            setShowLogoutConfirm(true);
+                                        }}
+                                        className="flex w-full items-center justify-center rounded bg-[#DE350B] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#bf2b0f] cursor-pointer"
+                                    >
+                                        <FontAwesomeIcon icon={faSignOutAlt} className="mr-2" />
+                                        Log Out
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </header>
+
+                {/* Mobile Header */}
+                <header className="h-16 bg-white border-b border-[#DFE1E6] flex lg:hidden items-center justify-between px-4 z-10 shrink-0 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <button onClick={toggleMobileSidebar} className="p-2 -ml-2 text-[#5E6C84] hover:text-[#172B4D] hover:bg-[#EBECF0] rounded-lg transition-colors">
+                            <FontAwesomeIcon icon={faBars} size="lg" />
+                        </button>
+                        <div className="w-8 h-8 rounded bg-[#0052CC] text-white flex items-center justify-center font-bold text-lg shrink-0">
+                            T
+                        </div>
+                        <span className="font-bold text-lg text-[#172B4D]">TMS</span>
+                    </div>
+                </header>
+
+                {/* Page Content Rendered Here via Outlet */}
+                <main className="flex-1 overflow-auto bg-[#FAFBFC] p-4">
+                    <Outlet />
+                </main>
+            </div>
+
+            <ConfirmDialog
+                open={showLogoutConfirm}
+                onClose={() => setShowLogoutConfirm(false)}
+                onConfirm={handleLogout}
+                title="Log out of your account?"
+                description="Are you sure you want to log out? Any unsaved changes might be lost."
+                confirmText="Log Out"
+                isDestructive={true}
+            />
+        </div>
+    );
+};
+
+const mapStateToProps = (state) => ({
+    headerTitle: state.common.headerTitle,
+})
+
+const mapDispatchToProps = {
+    setHeaderTitle,
+}
+
+export default connect(mapStateToProps, mapDispatchToProps)(DashboardLayout)

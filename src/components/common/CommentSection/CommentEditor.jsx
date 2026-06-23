@@ -1,0 +1,212 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import RichTextEditor from '../RichTextEditor';
+import DragDropAttachmentUpload from '../DragDropAttachmentUpload';
+import { Button } from '@mui/material';
+import { setAlert, setLoading } from '../../../redux/commonReducers/commonReducers';
+import { connect } from 'react-redux';
+import { addTicketComment, uploadCommentAttachment } from '../../../services/ticketCommentService';
+import CustomButton from '../CustomButton';
+import { getAllowedCommentTypes } from '../../../services/commentService';
+import CustomSelect from '../CustomSelect';
+import { getUserDetails } from '../../../utils/getUserDetails';
+
+const isHtmlEmpty = (html) => {
+    if (!html) return true;
+    const hasMedia = /<img[^>]*>|<iframe[^>]*>/i.test(html);
+    if (hasMedia) return false;
+    const cleanText = html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    return cleanText === '';
+};
+
+const CommentEditor = ({
+    onSubmit,
+    initialValue = '',
+    initialVisibility = 6,
+    existingAttachments = [],
+    onDeleteAttachment,
+    showVisibilitySelector = false,
+    cancelText = 'Cancel',
+    submitText = 'Save',
+    onCancel,
+    placeholder = 'Add a comment...',
+    isSubmitting = false,
+    loading,
+    setAlert,
+    setLoading,
+    ticketId,
+    parentId,
+    onSuccess
+}) => {
+    const currentUser = getUserDetails();
+    const [commentTypes, setCommentTypes] = useState(getAllowedCommentTypes())
+    const { control, handleSubmit, reset, watch, setValue } = useForm({
+        defaultValues: {
+            comment: initialValue,
+            comment_type_id: initialVisibility
+        }
+    });
+
+    const attachmentRef = useRef(null);
+    const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+
+    const handleFormSubmit = async (data) => {
+        console.log(data)
+        if (isHtmlEmpty(data.comment) && (!attachmentRef.current || attachmentRef.current.getPendingCount() === 0)) {
+            setAlert({
+                open: true,
+                type: 'error',
+                message: 'Comment cannot be empty'
+            });
+            return;
+        }
+        if (!data.comment_type_id) {
+            setAlert({
+                open: true,
+                type: 'error',
+                message: 'Please select a comment type'
+            });
+            return;
+        }
+        try {
+            setLoading(true);
+            let commentRes;
+
+            if (onSubmit) {
+                // Use parent provided onSubmit (could be for editing or custom logic)
+                commentRes = await onSubmit(data);
+            } else if (ticketId) {
+                // Handle creation directly
+                const payload = {
+                    ticket_id: ticketId,
+                    comment: data.comment,
+                    comment_type_id: data.comment_type_id,
+                    parent_comment_id: parentId || null
+                };
+
+                const res = await addTicketComment(payload);
+                commentRes = res.result;
+            }
+            if (commentRes) {
+                // Now upload pending files if any
+                setIsUploadingFiles(true);
+                if (attachmentRef.current) {
+                    await attachmentRef.current.uploadPendingFiles(commentRes?.id || commentRes?.result?.id);
+                }
+                setIsUploadingFiles(false);
+                reset();
+                if (onSuccess) onSuccess(commentRes);
+            } else {
+                setAlert({
+                    open: true,
+                    type: 'error',
+                    message: 'Failed to submit comment'
+                });
+            }
+        } catch (err) {
+            console.error("Failed to submit comment", err);
+            setAlert({
+                open: true,
+                type: 'error',
+                message: err.response?.data?.message || 'Failed to submit comment'
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        setValue('comment_type_id', initialVisibility);
+    }, [initialVisibility, setValue]);
+
+    return (
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col gap-3 w-full animate-fade-in">
+            <div className="bg-white overflow-hidden transition-all">
+                {showVisibilitySelector && (
+                    <div className="py-3">
+                        <CustomSelect
+                            name="comment_type_id"
+                            control={control}
+                            label="Visibility"
+                            options={commentTypes?.map(type => ({
+                                label: type.name,
+                                value: type.id
+                            })) || []}
+                            rules={{ required: "Visibility is required" }}
+                            fullWidth={false}
+                            className="mb-0"
+                            sx={{
+                                minWidth: 180,
+                                display: 'inline-block',
+                                '& .MuiInputBase-root': {
+                                    height: 32,
+                                    fontSize: '0.8rem'
+                                },
+                                '& .MuiInputLabel-root': {
+                                    fontSize: '0.8rem',
+                                    transform: 'translate(14px, 6px) scale(1)'
+                                },
+                                '& .MuiInputLabel-shrink': {
+                                    transform: 'translate(14px, -9px) scale(0.75)'
+                                }
+                            }}
+                            disabled={currentUser?.rolename?.toLowerCase() === "developer"}
+                        />
+                    </div>
+                )}
+                <RichTextEditor
+                    name="comment"
+                    control={control}
+                    placeholder={placeholder}
+                    minimal={false}
+                    className="mb-0"
+                />
+
+                <div className="py-4 bg-[#FAFBFC]">
+                    <DragDropAttachmentUpload
+                        ref={attachmentRef}
+                        uploadApiFunction={uploadCommentAttachment}
+                        existingAttachments={existingAttachments}
+                        onDeleteExisting={onDeleteAttachment}
+                        setAlert={() => { }} // Pass actual alert setter if needed
+                        compact={true}
+                    />
+                </div>
+            </div>
+
+            <div className="flex gap-3 items-center">
+                <CustomButton
+                    loading={isUploadingFiles || loading}
+                    disabled={isHtmlEmpty(watch("comment")) || isUploadingFiles || loading}
+                    type="submit"
+                >
+                    {submitText}
+                </CustomButton>
+                {onCancel && (
+                    <Button
+                        onClick={onCancel}
+                        sx={{
+                            color: '#42526E',
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            '&:hover': { bgcolor: '#EBECF0' }
+                        }}
+                    >
+                        {cancelText}
+                    </Button>
+                )}
+            </div>
+        </form>
+    );
+};
+
+const mapStateToProps = (state) => ({
+    loading: state.common.loading
+});
+
+const mapDispatchToProps = {
+    setAlert,
+    setLoading
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(CommentEditor);

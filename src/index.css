@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #f0f6ff;
+  --color-primary-100: #e0edff;
+  --color-primary-200: #c2ddff;
+  --color-primary-300: #94c7ff;
+  --color-primary-400: #5ca2ff;
+  --color-primary-500: #337fff;
+  --color-primary-600: #1a5aff;
+  --color-primary-700: #0040fa;
+  --color-primary-800: #0634c7;
+  --color-primary-900: #0b319e;
+  --color-primary-950: #071d5e;
+
+  --font-sans: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans antialiased;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+}
+
+/* Custom styling for integrated look */
+.editor-wrapper-custom {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.editor-toolbar-custom {
+  margin-bottom: 0 !important;
+  border: none !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  padding: 6px !important;
+  background: #f9fafb !important;
+}
+
+.editor-main-custom {
+  min-height: 150px !important;
+  padding: 12px !important;
+  overflow-y: auto !important;
+}
+
+/* Make toolbar icons smaller */
+.rdw-option-wrapper {
+  min-width: 24px !important;
+  height: 24px !important;
+  padding: 2px !important;
+}
+
+.public-DraftStyleDefault-block {
+  margin: 0 !important;
+}
+  
