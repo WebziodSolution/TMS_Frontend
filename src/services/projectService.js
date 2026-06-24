@@ -50,3 +50,24 @@ export const deleteProject = async (id) => {
         throw error;
     }
 };
+
+export const addToWatchlist = async (projectId) => {
+    try {
+        const response = await axiosInterceptor.post(`${projectURL}/${projectId}/watchlist`);
+        return response.data;
+    } catch (error) {
+        console.error(`Error adding project ${projectId} to watchlist:`, error);
+        throw error;
+    }
+};
+
+export const removeFromWatchlist = async (projectId) => {
+    try {
+        const response = await axiosInterceptor.delete(`${projectURL}/${projectId}/watchlist`);
+        return response.data;
+    } catch (error) {
+        console.error(`Error removing project ${projectId} from watchlist:`, error);
+        throw error;
+    }
+};
+

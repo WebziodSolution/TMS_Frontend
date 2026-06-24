@@ -10,7 +10,7 @@ import {
     faArrowLeft, faCalendarAlt, faClock, faFolder, faBuilding,
     faUser, faUsers, faTag, faDownload, faFileAlt, faComments,
     faPaperclip, faExclamationTriangle, faLink, faCheck, faInfoCircle,
-    faEdit, faSave, faPlay, faPause, faTasks
+    faEdit, faSave, faPlay, faPause, faTasks, faHistory
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -37,7 +37,7 @@ import { getUserHierarchy, getAllUsers } from '../../services/userService';
 import { getAllStatuses } from '../../services/statusService';
 import { deleteTicketAttachment, uploadTicketAttachment } from '../../services/ticketAttachmentService';
 import { upsertTodayTicketWork, getTodayTicketWork } from '../../services/todayTicketWorkService';
-import { checkCurrentWork, executeTicketLogAction, getActiveTicketLogs } from '../../services/ticketLogService';
+import { checkCurrentWork, executeTicketLogAction, getActiveTicketLogs, getTicketLogHistory } from '../../services/ticketLogService';
 import ReasonModal from './ReasonModal';
 
 dayjs.extend(relativeTime);
@@ -69,6 +69,11 @@ const TicketViewPage = ({ setAlert }) => {
         action: ''
     });
 
+    // Timer History States
+    const [openHistoryModal, setOpenHistoryModal] = useState(false);
+    const [historyLogs, setHistoryLogs] = useState([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
     const timerIntervalRef = useRef(null);
     const clockOffsetRef = useRef(0);
 
@@ -78,6 +83,80 @@ const TicketViewPage = ({ setAlert }) => {
         const mins = Math.floor((totalSecs % 3600) / 60);
         const secs = totalSecs % 60;
         return [hrs, mins, secs].map(v => v < 10 ? "0" + v : v).join(":");
+    };
+
+    const getLogDuration = (log) => {
+        if (log.status === 1) {
+            const start = dayjs(log.start_time);
+            const adjustedNow = dayjs(new Date().getTime() + clockOffsetRef.current);
+            const diffSecs = adjustedNow.diff(start, 'second');
+            return formatTime(diffSecs);
+        } else if (log.start_time && log.end_time) {
+            const start = dayjs(log.start_time);
+            const end = dayjs(log.end_time);
+            const diffSecs = end.diff(start, 'second');
+            return formatTime(diffSecs);
+        }
+        return "-";
+    };
+
+    const formatDateTime = (dtStr) => {
+        if (!dtStr) return '-';
+        return dayjs(dtStr).format('DD-MMM-YYYY hh:mm:ss A');
+    };
+
+    const fetchHistoryLogs = async () => {
+        if (!id || !userData?.id) return;
+        setIsHistoryLoading(true);
+        try {
+            const res = await getTicketLogHistory(id);
+            if (res.status === 200) {
+                setHistoryLogs(res.result || []);
+            } else {
+                setAlert({ message: "Failed to fetch timer history", severity: "error" });
+            }
+        } catch (err) {
+            console.error("Failed to load history logs", err);
+            setAlert({ message: "Failed to load timer history", severity: "error" });
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    };
+
+    const handleOpenHistoryModal = () => {
+        setOpenHistoryModal(true);
+        fetchHistoryLogs();
+    };
+
+    const groupLogsByDate = (logs) => {
+        const groups = {};
+        logs.forEach(log => {
+            if (!log.start_time) return;
+            const localDateStr = dayjs(log.start_time).format('YYYY-MM-DD');
+            if (!groups[localDateStr]) {
+                groups[localDateStr] = {
+                    date: localDateStr,
+                    logs: [],
+                    totalSeconds: 0
+                };
+            }
+            groups[localDateStr].logs.push(log);
+
+            // Calculate duration in seconds
+            let seconds = 0;
+            if (log.status === 1) {
+                const start = dayjs(log.start_time);
+                const adjustedNow = dayjs(new Date().getTime() + clockOffsetRef.current);
+                seconds = adjustedNow.diff(start, 'second');
+            } else if (log.start_time && log.end_time) {
+                const start = dayjs(log.start_time);
+                const end = dayjs(log.end_time);
+                seconds = end.diff(start, 'second');
+            }
+            groups[localDateStr].totalSeconds += Math.max(0, seconds);
+        });
+
+        return Object.values(groups).sort((a, b) => b.date.localeCompare(a.date));
     };
 
     const fetchTimerLogs = async () => {
@@ -1512,17 +1591,28 @@ const TicketViewPage = ({ setAlert }) => {
                                                 Time Tracker
                                             </span>
                                         </div>
-                                        {timerState === 'running' && (
-                                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 select-none">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                                                Live
-                                            </span>
-                                        )}
-                                        {timerState === 'paused' && (
-                                            <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-semibold select-none">
-                                                Paused
-                                            </span>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            {timerState === 'running' && (
+                                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 select-none">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                                    Live
+                                                </span>
+                                            )}
+                                            {timerState === 'paused' && (
+                                                <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-semibold select-none">
+                                                    Paused
+                                                </span>
+                                            )}
+                                            <Tooltip title="View Timer History">
+                                                <IconButton
+                                                    onClick={handleOpenHistoryModal}
+                                                    size="small"
+                                                    className="w-6 h-6 text-slate-400 hover:text-slate-650 hover:bg-slate-100 rounded transition-colors"
+                                                >
+                                                    <FontAwesomeIcon icon={faHistory} size="xs" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </div>
                                     </div>
 
                                     <div className="flex flex-col items-center justify-center py-2 space-y-3">
@@ -1703,6 +1793,111 @@ const TicketViewPage = ({ setAlert }) => {
                 submitText={reasonModalConfig.submitText}
                 isSubmitting={isTimerActionLoading}
             />
+
+            {/* Timer History Dialog Modal */}
+            <Dialog
+                open={openHistoryModal}
+                onClose={() => setOpenHistoryModal(false)}
+                maxWidth="lg"
+                fullWidth
+            >
+                <DialogTitle className="flex justify-between items-center bg-slate-50 border-b border-slate-200 py-3 px-4">
+                    <span className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faHistory} className="text-slate-500" />
+                        Timer History
+                    </span>
+                </DialogTitle>
+                <DialogContent className="p-4 bg-slate-50/50">
+                    {isHistoryLoading ? (
+                        <div className="flex flex-col items-center justify-center py-10 space-y-2">
+                            <CircularProgress size={28} />
+                            <span className="text-xs text-slate-500">Loading history...</span>
+                        </div>
+                    ) : historyLogs.length === 0 ? (
+                        <div className="text-center py-10 text-slate-400 text-xs italic">
+                            No timer logs found for this ticket.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto border border-slate-200 rounded-lg bg-white max-h-[60vh] mt-4">
+                            <table className="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr className="bg-gray-100 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider sticky top-0 z-50">
+                                        <th className="p-3.5 pl-4">Session Date</th>
+                                        <th className="p-3.5">Time Range</th>
+                                        <th className="p-3.5">Duration</th>
+                                        <th className="p-3.5">Completed Date</th>
+                                        <th className="p-3.5 pr-4">Note / Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {groupLogsByDate(historyLogs).map((group) => (
+                                        <React.Fragment key={group.date}>
+                                            {/* Daily Group Subheader */}
+                                            <tr className="border-b border-slate-100 bg-gray-100">
+                                                <td colSpan={3} className="p-3.5 pl-4 font-bold text-slate-800 text-[13px] bg-gray-100">
+                                                    <div className="flex items-center gap-2">
+                                                        <FontAwesomeIcon icon={faCalendarAlt} className="text-slate-500" />
+                                                        <span>{dayjs(group.date).format('dddd, D MMM YYYY')}</span>
+                                                    </div>
+                                                </td>
+                                                <td colSpan={2} className="p-3.5 pr-4 text-right bg-gray-100">
+                                                    <span className="text-blue-700 font-bold font-mono text-[12px]">
+                                                        Total: {formatTime(group.totalSeconds)}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {/* Individual Log Rows */}
+                                            {group.logs.map((log) => (
+                                                <tr key={log.id} className="hover:bg-slate-50/30 transition-colors border-b border-slate-200/50 last:border-b-0">
+                                                    <td className="p-3.5 pl-4"></td>
+                                                    <td className="p-3.5 text-slate-700">
+                                                        <span>{dayjs(log.start_time).format('hh:mm:ss A')}</span>
+                                                        <span className="mx-2 text-slate-400">-</span>
+                                                        {log.status === 1 ? (
+                                                            <span className="text-emerald-600 font-semibold italic">Ongoing</span>
+                                                        ) : (
+                                                            <span>{dayjs(log.end_time).format('hh:mm:ss A')}</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-3.5 font-mono text-slate-700">
+                                                        {getLogDuration(log)}
+                                                    </td>
+                                                    <td className="p-3.5 text-slate-650">
+                                                        {log.complete_date ? dayjs(log.complete_date).format('DD-MMM-YYYY hh:mm A') : '-'}
+                                                    </td>
+                                                    <td className="p-3.5 text-slate-500 pr-4 max-w-xs truncate" title={log.note || ''}>
+                                                        {log.note || '-'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </DialogContent>
+                <DialogActions className="border-t border-slate-200 p-3 bg-slate-50">
+                    <Button
+                        onClick={() => setOpenHistoryModal(false)}
+                        variant="outlined"
+                        size="small"
+                        sx={{
+                            color: '#64748b',
+                            borderColor: '#cbd5e1',
+                            '&:hover': {
+                                borderColor: '#94a3b8',
+                                backgroundColor: '#f1f5f9'
+                            },
+                            textTransform: 'none',
+                            fontSize: '0.75rem',
+                            fontWeight: '600'
+                        }}
+                    >
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     );
 };

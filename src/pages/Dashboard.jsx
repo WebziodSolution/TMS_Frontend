@@ -83,6 +83,7 @@ const Dashboard = ({ sessionEndModel }) => {
     const navigate = useNavigate();
     const token = getCookie('tms_token');
     const [data, setData] = useState(null);
+    const userDetails = getUserDetails();
 
     if (!token) {
         navigate('/');
@@ -101,6 +102,95 @@ const Dashboard = ({ sessionEndModel }) => {
     }, [])
     return (
         <div className="w-full max-w-7xl mx-auto space-y-8 animate-fade-in-up">
+
+            {/* Watchlist Kanban Board Section */}
+            {(() => {
+                const role = userDetails?.rolename;
+                const showWatchlist = ["administrator", "admin", "manager"].includes(role?.toLowerCase());
+
+                if (!showWatchlist) return null;
+
+                return (
+                    <>
+                        {
+                            (data?.watchlist && data?.watchlist.length > 0) && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-xl font-bold text-[#172B4D]">Watchlist</h2>
+                                        {data?.watchlist && data?.watchlist.length > 0 && (
+                                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#DEEBFF] text-[#0747A6]">
+                                                {data.watchlist.length} {data.watchlist.length === 1 ? 'Project' : 'Projects'}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {data.watchlist.map((project) => (
+                                            <div key={project.project_id} className="bg-[#F4F5F7] rounded-sm p-3 flex flex-col min-w-[250px] border border-[#DFE1E6]">
+                                                {/* Column Header */}
+                                                <div className="flex items-center justify-between mb-2 border-b border-[#DFE1E6] pb-2">
+                                                    <h3 className="font-bold text-sm text-[#172B4D] truncate pr-2" title={project.project_name}>
+                                                        {project.project_name}
+                                                    </h3>
+                                                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-[#DFE1E6] text-[#42526E]">
+                                                        {project.tickets ? project.tickets.length : 0}
+                                                    </span>
+                                                </div>
+
+                                                {/* Column Body / Tickets List */}
+                                                <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[150px]">
+                                                    {!project.tickets || project.tickets.length === 0 ? (
+                                                        <div className="flex items-center justify-center h-24 border border-dashed border-[#DFE1E6] rounded-sm bg-white/50">
+                                                            <span className="text-xs text-[#8993A4]">No active tickets</span>
+                                                        </div>
+                                                    ) : (
+                                                        project.tickets.map((ticket) => (
+                                                            <div
+                                                                key={ticket.ticket_id}
+                                                                className="p-4 bg-white border border-[#DFE1E6] rounded-sm shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer hover:border-[#4C9AFF]"
+                                                                onClick={() => navigate(`/dashboard/manage-tickets/view/${ticket.ticket_id}`)}
+                                                            >
+                                                                {/* Ticket Title */}
+                                                                <h4 className="font-bold text-sm text-[#172B4D] mb-3 line-clamp-2 hover:text-[#0052CC] transition-colors">
+                                                                    {ticket.ticket_name}
+                                                                </h4>
+
+                                                                {/* Ticket Info & Type Badge */}
+                                                                <div className="flex items-center justify-between text-xs text-[#5E6C84]">
+                                                                    <div className="flex items-center gap-1.5 text-[#0052CC] font-semibold">
+                                                                        <span>{ticket.ticket_no}</span>
+                                                                    </div>
+                                                                    {ticket.type && (
+                                                                        <span className={`px-2 py-0.5 rounded font-bold text-[10px] uppercase ${ticket.type.toLowerCase() === 'bug'
+                                                                            ? 'bg-[#FFEBE6] text-[#DE350B]'
+                                                                            : 'bg-[#E3FCEF] text-[#36B37E]'
+                                                                            }`}>
+                                                                            {ticket.type}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Working Users List */}
+                                                                {ticket.users && ticket.users.length > 0 && (
+                                                                    <div className="mt-3 pt-3 border-t border-[#F4F5F7]">
+                                                                        <div className="text-xs text-[#5E6C84] font-medium">
+                                                                            <span className="text-[10px] uppercase font-bold text-[#8993A4]">Work Users:</span> &nbsp; {ticket.users.map((u) => u.user_name).join(', ')}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )
+                        }
+                    </>
+                );
+            })()}
 
             {/* Idle Developers Section (No Work) */}
             {(() => {

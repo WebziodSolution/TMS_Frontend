@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { CircularProgress, IconButton } from '@mui/material';
+import { CircularProgress, IconButton, Checkbox } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import Tooltip, { tooltipClasses } from '@mui/material/Tooltip';
 
 import { connect } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faEdit, faTrash, faFolderOpen, faTicketAlt } from '@fortawesome/free-solid-svg-icons';
-import { getAllProjects, deleteProject } from '../../services/projectService';
+import { getAllProjects, deleteProject, addToWatchlist, removeFromWatchlist } from '../../services/projectService';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import PermissionWrapper from '../../components/permissionWrapper/PermissionWrapper';
 import CustomButton from '../../components/common/CustomButton';
 import ProjectFormDialog from './ProjectFormDialog';
 import TicketFormModal from '../Tickets/TicketFormModal';
 import { setAlert } from '../../redux/commonReducers/commonReducers';
+import { getUserDetails } from '../../utils/getUserDetails';
 
 const CustomTooltip = styled(({ className, ...props }) => (
     <Tooltip {...props} arrow classes={{ popper: className }} />
@@ -37,6 +38,10 @@ const CustomTooltip = styled(({ className, ...props }) => (
 }));
 
 const ManageProjects = ({ setAlert }) => {
+    const userDetails = getUserDetails();
+    const role = userDetails?.rolename;
+    const showWatchlist = ["administrator", "admin", "manager"].includes(role?.toLowerCase());
+
     const [projects, setProjects] = useState([]);
     const [actionLoading, setActionLoading] = useState(false);
 
@@ -103,6 +108,35 @@ const ManageProjects = ({ setAlert }) => {
             setActionLoading(false);
         }
     };
+
+    const handleWatchlistToggle = async (project, isChecked) => {
+        // Optimistic update
+        setProjects(prevProjects =>
+            prevProjects.map(p =>
+                p.id === project.id ? { ...p, in_watchlist: isChecked } : p
+            )
+        );
+
+        try {
+            if (isChecked) {
+                await addToWatchlist(project.id);
+                setAlert({ open: true, message: "Added to watchlist successfully.", type: "success" });
+            } else {
+                await removeFromWatchlist(project.id);
+                setAlert({ open: true, message: "Removed from watchlist successfully.", type: "success" });
+            }
+        } catch (err) {
+            console.error(err);
+            // Revert state on error
+            setProjects(prevProjects =>
+                prevProjects.map(p =>
+                    p.id === project.id ? { ...p, in_watchlist: !isChecked } : p
+                )
+            );
+            setAlert({ open: true, message: err.message || "Failed to update watchlist.", type: "error" });
+        }
+    };
+
 
     return (
         <div className="space-y-4 max-w-7xl mx-auto">
@@ -191,7 +225,33 @@ const ManageProjects = ({ setAlert }) => {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div>
+                                            <div className="flex items-center justify-end space-x-1">
+                                                {
+                                                    showWatchlist && (
+                                                        <PermissionWrapper
+                                                            functionalityName="manage tickets"
+                                                            moduleName="Tickets"
+                                                            actionId={1}
+                                                            component={
+                                                                <Tooltip title="Watchlist">
+                                                                    <Checkbox
+                                                                        checked={!!project.in_watchlist}
+                                                                        onChange={(e) => handleWatchlistToggle(project, e.target.checked)}
+                                                                        size="small"
+                                                                        sx={{
+                                                                            color: '#7A869A',
+                                                                            '&.Mui-checked': {
+                                                                                color: '#FFAB00',
+                                                                            },
+                                                                            padding: '4px',
+                                                                            marginRight: '10px',
+                                                                        }}
+                                                                    />
+                                                                </Tooltip>
+                                                            }
+                                                        />
+                                                    )
+                                                }
                                                 <PermissionWrapper
                                                     functionalityName="manage tickets"
                                                     moduleName="Tickets"

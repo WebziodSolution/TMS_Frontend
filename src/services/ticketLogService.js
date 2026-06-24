@@ -22,6 +22,16 @@ export const getActiveTicketLogs = async (ticketId) => {
     }
 };
 
+export const getTicketLogHistory = async (ticketId) => {
+    try {
+        const response = await axiosInterceptor.get(`${ticketLogURL}/ticket/${ticketId}/history`);
+        return response.data;
+    } catch (error) {
+        console.error(`Error fetching ticket log history for ticket ${ticketId}:`, error);
+        throw error;
+    }
+};
+
 // --- CRUD functions for completeness ---
 
 export const createTicketLog = async (data) => {

@@ -138,7 +138,11 @@ const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert }) =>
 
     return (
         <>
-            <Draggable draggableId={String(ticket.id)} index={index}>
+            <Draggable 
+                draggableId={String(ticket.id)} 
+                index={index}
+                isDragDisabled={ticket.status_name?.toLowerCase() === 'close'}
+            >
                 {(provided, snapshot) => (
                     <Box
                         ref={provided.innerRef}
@@ -157,7 +161,7 @@ const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert }) =>
                             boxShadow: snapshot.isDragging
                                 ? '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)'
                                 : '0 1px 2px rgba(9, 30, 66, 0.25)',
-                            border: isOverdue ? '2px solid #FF5630' : '1px solid #dfe1e6',
+                            border: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '2px solid #FF5630' : '1px solid #dfe1e6',
                             transition: 'all 0.2s ease',
                             position: 'relative',
                             '&:hover': {
@@ -288,14 +292,14 @@ const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert }) =>
                                                     gap: 0.5,
                                                     padding: '2px 6px',
                                                     borderRadius: '3px',
-                                                    backgroundColor: isOverdue ? '#FFEBE6' : 'transparent',
-                                                    color: isOverdue ? '#BF2600' : '#6B778C',
-                                                    border: isOverdue ? '1px solid #FF5630' : 'none',
+                                                    backgroundColor: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '#FFEBE6' : 'transparent',
+                                                    color: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '#BF2600' : '#6B778C',
+                                                    border: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '1px solid #FF5630' : 'none',
                                                     whiteSpace: 'nowrap',
                                                     flexShrink: 0
                                                 }}
                                             >
-                                                {isOverdue && <FontAwesomeIcon icon={faExclamationTriangle} size="xs" />}
+                                                {(isOverdue && ticket.status_name?.toLowerCase() !== 'close') && <FontAwesomeIcon icon={faExclamationTriangle} size="xs" />}
                                                 <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '11px' }}>
                                                     {formatDate(ticket.due_date)}
                                                 </Typography>
