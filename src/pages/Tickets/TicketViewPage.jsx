@@ -42,6 +42,45 @@ import ReasonModal from './ReasonModal';
 
 dayjs.extend(relativeTime);
 
+const TimerDisplay = ({ timerState, initialSeconds, activeLog, clockOffset }) => {
+    const [seconds, setSeconds] = useState(initialSeconds);
+
+    useEffect(() => {
+        setSeconds(initialSeconds);
+    }, [initialSeconds]);
+
+    useEffect(() => {
+        if (timerState !== 'running' || !activeLog) {
+            return;
+        }
+
+        const startTime = dayjs(activeLog.start_time);
+        const updateTimer = () => {
+            const adjustedNow = dayjs(new Date().getTime() + clockOffset);
+            const diff = adjustedNow.diff(startTime, 'second');
+            setSeconds(Math.max(0, initialSeconds + diff));
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [timerState, activeLog, clockOffset, initialSeconds]);
+
+    const formatTime = (totalSecs) => {
+        const secs = Math.max(0, totalSecs);
+        const hrs = Math.floor(secs / 3600);
+        const mins = Math.floor((secs % 3600) / 60);
+        const s = secs % 60;
+        return [hrs, mins, s].map(v => v < 10 ? "0" + v : v).join(":");
+    };
+
+    return (
+        <div className="font-mono text-3xl font-bold tracking-wider text-slate-800 select-none">
+            {formatTime(seconds)}
+        </div>
+    );
+};
+
 const TicketViewPage = ({ setAlert }) => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -56,7 +95,8 @@ const TicketViewPage = ({ setAlert }) => {
     // Time Tracker States
     const [timerLogs, setTimerLogs] = useState([]);
     const [timerState, setTimerState] = useState('stopped'); // 'stopped', 'running', 'paused'
-    const [displaySeconds, setDisplaySeconds] = useState(0);
+    const [accumulatedSeconds, setAccumulatedSeconds] = useState(0);
+    const [activeTimerLog, setActiveTimerLog] = useState(null);
     const [isTimerActionLoading, setIsTimerActionLoading] = useState(false);
     const [disabledStartButton, setDisabledStartButton] = useState(false)
 
@@ -74,7 +114,6 @@ const TicketViewPage = ({ setAlert }) => {
     const [historyLogs, setHistoryLogs] = useState([]);
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-    const timerIntervalRef = useRef(null);
     const clockOffsetRef = useRef(0);
 
     const formatTime = (seconds) => {
@@ -187,27 +226,14 @@ const TicketViewPage = ({ setAlert }) => {
                     }
                 });
 
+                setAccumulatedSeconds(total);
+                setActiveTimerLog(activeLog);
+
                 if (activeLog) {
-                    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                    const baseTime = total;
-                    const startTime = dayjs(activeLog.start_time);
-
-                    const updateTimer = () => {
-                        const adjustedNow = dayjs(new Date().getTime() + clockOffsetRef.current);
-                        const diff = adjustedNow.diff(startTime, 'second');
-                        setDisplaySeconds(Math.max(0, baseTime + diff));
-                    };
-                    updateTimer(); // Initial calculation
-
-                    timerIntervalRef.current = setInterval(updateTimer, 1000);
                     setTimerState('running');
                 } else if (logs.length > 0) {
-                    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                    setDisplaySeconds(total);
                     setTimerState('paused');
                 } else {
-                    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                    setDisplaySeconds(0);
                     setTimerState('stopped');
                 }
             }
@@ -369,11 +395,6 @@ const TicketViewPage = ({ setAlert }) => {
             fetchTodayWork();
             fetchTimerLogs();
         }
-        return () => {
-            if (timerIntervalRef.current) {
-                clearInterval(timerIntervalRef.current);
-            }
-        };
     }, [id, userData?.id]);
 
     // Core data state
@@ -1617,9 +1638,12 @@ const TicketViewPage = ({ setAlert }) => {
 
                                     <div className="flex flex-col items-center justify-center py-2 space-y-3">
                                         {/* Timer Display */}
-                                        <div className="font-mono text-3xl font-bold tracking-wider text-slate-800 select-none">
-                                            {formatTime(displaySeconds)}
-                                        </div>
+                                        <TimerDisplay
+                                            timerState={timerState}
+                                            initialSeconds={accumulatedSeconds}
+                                            activeLog={activeTimerLog}
+                                            clockOffset={clockOffsetRef.current}
+                                        />
 
                                         {/* Controls */}
                                         <div className="flex items-center gap-3">
