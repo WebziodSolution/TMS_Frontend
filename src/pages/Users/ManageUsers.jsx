@@ -49,9 +49,6 @@ const ManageUsers = ({ setAlert, setLoading, loading }) => {
         }
     });
 
-    const selectedRoleIds = watch("role_ids") || [];
-    const selectedRoleIdsStr = JSON.stringify(selectedRoleIds);
-
     useEffect(() => {
         const decryptCompanyId = async () => {
             if (companyIdParam) {
@@ -86,8 +83,10 @@ const ManageUsers = ({ setAlert, setLoading, loading }) => {
                 res = await getAllUsers(companyId);
             } else {
                 const currentSelectedRoles = watch("role_ids") || [];
-                if (currentSelectedRoles.length > 0) {
-                    res = await filterUsers(currentSelectedRoles);
+                const currentSelectedCompany = watch("company_ids") || [];
+
+                if (currentSelectedRoles.length > 0 || currentSelectedCompany.length > 0) {
+                    res = await filterUsers(currentSelectedRoles, currentSelectedCompany);
                 } else {
                     res = await getAllUsers();
                 }
@@ -108,7 +107,9 @@ const ManageUsers = ({ setAlert, setLoading, loading }) => {
         if (!companyIdParam) {
             try {
                 const res = await getAllRoles();
+                console.log("res", res)
                 const data = res.result?.map((row) => ({ label: row.name, value: row.id })) || [];
+                console.log("data role", data)
                 setDbRoles(data);
             } catch (err) {
                 console.error(err);
@@ -122,6 +123,7 @@ const ManageUsers = ({ setAlert, setLoading, loading }) => {
             try {
                 const res = await getAllCompanies();
                 const data = res.result?.map((row) => ({ label: row.company_name, value: row.id })) || [];
+                console.log(data);
                 setCompanies(data);
             } catch (err) {
                 console.error(err);
@@ -137,7 +139,7 @@ const ManageUsers = ({ setAlert, setLoading, loading }) => {
 
     useEffect(() => {
         fetchUsers();
-    }, [selectedRoleIdsStr, companyId, isDecrypting]);
+    }, [watch("company_ids"), watch("role_ids"), companyId, isDecrypting]);
 
     const handleOpen = (user = null) => {
         if (user) {

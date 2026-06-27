@@ -94,12 +94,20 @@ export const getAllAdmins = async () => {
     }
 };
 
-export const filterUsers = async (roleIds) => {
+export const filterUsers = async (roleIds, companyIds) => {
     try {
         let url = `${userURL}/filter`;
         if (roleIds && roleIds.length > 0) {
             const queryParams = roleIds.map(id => `role_ids=${id}`).join('&');
             url += `?${queryParams}`;
+        }
+        if (companyIds && companyIds.length > 0) {
+            const queryParams = companyIds.map(id => `company_ids=${id}`).join('&');
+            if (roleIds.length > 0) {
+                url += `&${queryParams}`;
+            } else {
+                url += `?${queryParams}`;
+            }
         }
         const response = await axiosInterceptor.get(url);
         return response.data;

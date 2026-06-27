@@ -64,7 +64,7 @@ const CustomSelect = ({
                                 // helperText={error ? error.message : null}
                                 />
                             )}
-                            limitTags={limitTags}
+                            limitTags={limitTags === 0 ? -1 : limitTags}
                         />
                     </FormControl>
                 );

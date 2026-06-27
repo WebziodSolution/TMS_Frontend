@@ -33,7 +33,7 @@ import RichTextEditor from '../../components/common/RichTextEditor';
 import DragDropAttachmentUpload from '../../components/common/DragDropAttachmentUpload';
 import HierarchySelect from '../../components/common/HierarchySelect';
 import DatePickerComponent from '../../components/common/datePickerComponent';
-import { getUserHierarchy, getAllUsers } from '../../services/userService';
+import { getUserHierarchy, getAllUsers, getCustomers } from '../../services/userService';
 import { getAllStatuses } from '../../services/statusService';
 import { deleteTicketAttachment, uploadTicketAttachment } from '../../services/ticketAttachmentService';
 import { upsertTodayTicketWork, getTodayTicketWork } from '../../services/todayTicketWorkService';
@@ -419,6 +419,7 @@ const TicketViewPage = ({ setAlert }) => {
             working_hours: null,
             user_type: 'as_customer',
             assignees: [],
+            clients: [],
             status_id: '',
             owner_id: null,
             type: 1
@@ -438,8 +439,11 @@ const TicketViewPage = ({ setAlert }) => {
     const [projectTickets, setProjectTickets] = useState([]);
     const [loadingProjectTickets, setLoadingProjectTickets] = useState(false);
     const [isSavingAssignees, setIsSavingAssignees] = useState(false);
+    const [clientsList, setClientsList] = useState([]);
 
     const selectedAssigneeIds = watch('assignees') || [];
+    const selectedClientIds = watch('clients') || [];
+    const combinedWatchlistIds = Array.from(new Set([...selectedAssigneeIds, ...selectedClientIds]));
     const selectedProjectId = watch('project_id');
     const prevProjectIdRef = useRef(null);
 
@@ -480,7 +484,7 @@ const TicketViewPage = ({ setAlert }) => {
     }, [selectedProjectId, id]);
 
     useEffect(() => {
-        if (selectedAssigneeIds.length > 0) {
+        if (selectedAssigneeIds.length > 0 || selectedClientIds.length > 0) {
             setSendMailSettings(prev => {
                 const updated = { ...prev };
                 let changed = false;
@@ -490,28 +494,37 @@ const TicketViewPage = ({ setAlert }) => {
                         changed = true;
                     }
                 });
+                selectedClientIds.forEach(id => {
+                    if (updated[id] === undefined) {
+                        updated[id] = 'N';
+                        changed = true;
+                    }
+                });
                 return changed ? updated : prev;
             });
         }
-    }, [selectedAssigneeIds]);
+    }, [selectedAssigneeIds, selectedClientIds]);
 
     const getUsersByCompanyId = async () => {
         try {
-            if (!watch('project_id')) {
-                setUsers([]);
-                return;
-            }
-            const selectedCompanyId = projects.find(p => p.id === watch('project_id'))?.company_id;
+            const projId = watch('project_id');
+            const selectedCompanyId = projects.find(p => p.id === projId)?.company_id;
             if (selectedCompanyId) {
                 const res = await getAllUsers(selectedCompanyId);
                 const options = res.result?.map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
                 setUsers(options || []);
+            } else {
+                setUsers([]);
             }
         } catch (err) {
             console.error("Failed to load users", err);
         }
     };
-
+    const handleGetAllCustomer = async () => {
+        const custRes = await getCustomers();
+        const clientOpts = (custRes.result || []).map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
+        setClientsList(clientOpts);
+    }
     useEffect(() => {
         getUsersByCompanyId();
     }, [watch('project_id'), projects]);
@@ -529,7 +542,13 @@ const TicketViewPage = ({ setAlert }) => {
             }
             return null;
         };
-        return findName(hierarchyData) || `User ${id}`;
+        const nameFromHierarchy = findName(hierarchyData);
+        if (nameFromHierarchy) return nameFromHierarchy;
+        const clientObj = clientsList.find(c => String(c.value) === String(id));
+        if (clientObj) return clientObj.label;
+        const userObj = users.find(u => String(u.value) === String(id));
+        if (userObj) return userObj.label;
+        return `User ${id}`;
     };
 
     const fetchUsers = async () => {
@@ -564,14 +583,20 @@ const TicketViewPage = ({ setAlert }) => {
         }
 
         const formattedDate = ticket.due_date ? dayjs(ticket.due_date) : null;
-        const formattedAssignees = (ticket.assignees || []).map(a => {
-            return typeof a === 'object' ? a.id : a;
-        });
-
+        const formattedAssignees = [];
+        const formattedClients = [];
         const initialSendMail = {};
         (ticket.assignees || []).forEach(a => {
-            const id = typeof a === 'object' ? a.id : a;
-            initialSendMail[id] = a.send_mail || 'Y';
+            const isObj = typeof a === 'object';
+            const id = isObj ? a.id : a;
+            const isClient = isObj ? !!a.is_client : false;
+            const sendMail = isObj ? (a.send_mail || (isClient ? 'N' : 'Y')) : 'Y';
+            initialSendMail[id] = sendMail;
+            if (isClient) {
+                formattedClients.push(id);
+            } else {
+                formattedAssignees.push(id);
+            }
         });
         setSendMailSettings(initialSendMail);
 
@@ -586,6 +611,7 @@ const TicketViewPage = ({ setAlert }) => {
             working_hours: ticket.working_hours || null,
             // user_type: isForCustomer ? 'for_customer' : 'as_customer',
             assignees: formattedAssignees,
+            clients: formattedClients,
             status_id: ticket.status_id || '',
             owner_id: ticket.owner_id || ticket.created_by || null,
             type: TICKET_TYPES?.find(t => t.label === ticket?.type)?.value || 1
@@ -627,19 +653,33 @@ const TicketViewPage = ({ setAlert }) => {
                 ...data,
                 type: TICKET_TYPES?.find(t => t.value === data?.type)?.label || "New Feature"
             };
-            if (payload.assignees) {
-                payload.assignees = payload.assignees.map(id => {
-                    let cleanId = id;
-                    if (typeof id === 'string' && id.startsWith('u-')) {
-                        cleanId = parseInt(id.substring(2), 10);
-                    }
-                    const sendMailVal = sendMailSettings[id] || 'Y';
-                    return {
-                        id: cleanId,
-                        send_mail: sendMailVal
-                    };
+
+            const assigneeMap = new Map();
+            (data.assignees || []).forEach(id => {
+                let cleanId = id;
+                if (typeof id === 'string' && id.startsWith('u-')) {
+                    cleanId = parseInt(id.substring(2), 10);
+                }
+                assigneeMap.set(cleanId, {
+                    id: cleanId,
+                    send_mail: sendMailSettings[id] || 'Y',
+                    is_client: false
                 });
-            }
+            });
+            (data.clients || []).forEach(id => {
+                let cleanId = id;
+                if (typeof id === 'string' && id.startsWith('u-')) {
+                    cleanId = parseInt(id.substring(2), 10);
+                }
+                assigneeMap.set(cleanId, {
+                    id: cleanId,
+                    send_mail: sendMailSettings[id] || 'N',
+                    is_client: true
+                });
+            });
+            payload.assignees = Array.from(assigneeMap.values());
+            delete payload.clients;
+
             if (payload.due_date) {
                 payload.due_date = payload.due_date.format('YYYY-MM-DD');
             } else {
@@ -683,28 +723,37 @@ const TicketViewPage = ({ setAlert }) => {
     };
 
     const handleSaveAssigneesOnly = async () => {
-        const selectedAssignees = watch('assignees');
-        if (!selectedAssignees || selectedAssignees.length === 0) {
-            setAlert({ open: true, message: "Assign users is required", type: "warning" });
-            return;
-        }
+        const selectedAssignees = watch('assignees') || [];
+        const selectedClients = watch('clients') || [];
 
         setIsSavingAssignees(true);
         try {
-            const formattedAssignees = selectedAssignees.map(id => {
+            const assigneeMap = new Map();
+            selectedAssignees.forEach(id => {
                 let cleanId = id;
                 if (typeof id === 'string' && id.startsWith('u-')) {
                     cleanId = parseInt(id.substring(2), 10);
                 }
-                const sendMailVal = sendMailSettings[id] || 'Y';
-                return {
+                assigneeMap.set(cleanId, {
                     id: cleanId,
-                    send_mail: sendMailVal
-                };
+                    send_mail: sendMailSettings[id] || 'Y',
+                    is_client: false
+                });
+            });
+            selectedClients.forEach(id => {
+                let cleanId = id;
+                if (typeof id === 'string' && id.startsWith('u-')) {
+                    cleanId = parseInt(id.substring(2), 10);
+                }
+                assigneeMap.set(cleanId, {
+                    id: cleanId,
+                    send_mail: sendMailSettings[id] || 'N',
+                    is_client: true
+                });
             });
 
             const payload = {
-                assignees: formattedAssignees
+                assignees: Array.from(assigneeMap.values())
             };
 
             const res = await updateTicketAssignees(ticket.id, payload);
@@ -753,6 +802,7 @@ const TicketViewPage = ({ setAlert }) => {
     useEffect(() => {
         if (id) {
             fetchData();
+            handleGetAllCustomer()
         }
     }, [id]);
 
@@ -1461,11 +1511,28 @@ const TicketViewPage = ({ setAlert }) => {
                                         />
                                     </div>
 
-                                    {selectedAssigneeIds.length > 0 && (
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                                Clients ({watch('clients')?.length || 0})
+                                            </label>
+                                        </div>
+                                        <CustomSelect
+                                            name="clients"
+                                            control={control}
+                                            label=""
+                                            options={clientsList}
+                                            multiple={true}
+                                            withCheckbox={true}
+                                            limitTags={0}
+                                        />
+                                    </div>
+
+                                    {combinedWatchlistIds.length > 0 && (
                                         <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg shadow-sm">
                                             <h4 className="text-[10px] font-bold text-slate-700 mb-1.5 uppercase tracking-wider font-sans">Watch List</h4>
                                             <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
-                                                {selectedAssigneeIds.map(id => {
+                                                {combinedWatchlistIds.map(id => {
                                                     const name = getUserNameById(id);
                                                     const isChecked = sendMailSettings[id] !== 'N';
                                                     return (

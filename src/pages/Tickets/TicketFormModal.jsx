@@ -11,7 +11,7 @@ import { faLink, faCheck } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import { getTicketById, addTicket, updateTicket, getTicketsByProjectId } from '../../services/ticketService';
 import { deleteTicketAttachment, uploadTicketAttachment } from '../../services/ticketAttachmentService';
-import { getAllUsers, getUserHierarchy } from '../../services/userService';
+import { getAllUsers, getUserHierarchy, getCustomers } from '../../services/userService';
 import { getAllStatuses } from '../../services/statusService';
 import { setAlert } from '../../redux/commonReducers/commonReducers';
 import { connect } from 'react-redux';
@@ -44,6 +44,7 @@ const TicketFormModal = ({
             working_hours: null,
             user_type: 'as_customer',
             assignees: [],
+            clients: [],
             status_id: '',
             owner_id: null,
             type: 1
@@ -60,8 +61,11 @@ const TicketFormModal = ({
     const [sendMailSettings, setSendMailSettings] = useState({});
     const [projectTickets, setProjectTickets] = useState([]);
     const [loadingProjectTickets, setLoadingProjectTickets] = useState(false);
+    const [clientsList, setClientsList] = useState([]);
 
     const selectedAssigneeIds = watch('assignees') || [];
+    const selectedClientIds = watch('clients') || [];
+    const combinedWatchlistIds = Array.from(new Set([...selectedAssigneeIds, ...selectedClientIds]));
     const selectedProjectId = watch('project_id');
     const prevProjectIdRef = useRef(null);
 
@@ -102,7 +106,7 @@ const TicketFormModal = ({
     }, [selectedProjectId, editingTicketId]);
 
     useEffect(() => {
-        if (selectedAssigneeIds.length > 0) {
+        if (selectedAssigneeIds.length > 0 || selectedClientIds.length > 0) {
             setSendMailSettings(prev => {
                 const updated = { ...prev };
                 let changed = false;
@@ -112,10 +116,16 @@ const TicketFormModal = ({
                         changed = true;
                     }
                 });
+                selectedClientIds.forEach(id => {
+                    if (updated[id] === undefined) {
+                        updated[id] = 'N';
+                        changed = true;
+                    }
+                });
                 return changed ? updated : prev;
             });
         }
-    }, [selectedAssigneeIds]);
+    }, [selectedAssigneeIds, selectedClientIds]);
 
     const getUserNameById = (id) => {
         const findName = (nodes) => {
@@ -130,7 +140,13 @@ const TicketFormModal = ({
             }
             return null;
         };
-        return findName(hierarchyData) || `User ${id}`;
+        const nameFromHierarchy = findName(hierarchyData);
+        if (nameFromHierarchy) return nameFromHierarchy;
+        const clientObj = clientsList.find(c => String(c.value) === String(id));
+        if (clientObj) return clientObj.label;
+        const userObj = users.find(u => String(u.value) === String(id));
+        if (userObj) return userObj.label;
+        return `User ${id}`;
     };
 
     const attachmentRef = useRef(null);
@@ -154,7 +170,7 @@ const TicketFormModal = ({
     const fetchProjects = async () => {
         try {
             const res = await getAllProjects();
-            const options = res.result?.map(u => ({ label: `${u.name}`, value: u.id, company_id: u.company_id }));
+            const options = res.result?.map(u => ({ label: `${u.name}`, value: u.id, company_id: u.company_id, project_type: u.project_type, client_name: u.client_name, client_id: u.client_id }));
             setProjects(options);
         } catch (err) {
             console.error(err);
@@ -190,19 +206,32 @@ const TicketFormModal = ({
         try {
             // Prepare payload correctly
             const payload = { ...data, type: TICKET_TYPES?.find(t => t.value === data?.type)?.label || "New Feature" };
-            if (payload.assignees) {
-                payload.assignees = payload.assignees.map(id => {
-                    let cleanId = id;
-                    if (typeof id === 'string' && id.startsWith('u-')) {
-                        cleanId = parseInt(id.substring(2), 10);
-                    }
-                    const sendMailVal = sendMailSettings[id] || 'Y';
-                    return {
-                        id: cleanId,
-                        send_mail: sendMailVal
-                    };
+
+            const assigneeMap = new Map();
+            (data.assignees || []).forEach(id => {
+                let cleanId = id;
+                if (typeof id === 'string' && id.startsWith('u-')) {
+                    cleanId = parseInt(id.substring(2), 10);
+                }
+                assigneeMap.set(cleanId, {
+                    id: cleanId,
+                    send_mail: sendMailSettings[id] || 'Y',
+                    is_client: false
                 });
-            }
+            });
+            (data.clients || []).forEach(id => {
+                let cleanId = id;
+                if (typeof id === 'string' && id.startsWith('u-')) {
+                    cleanId = parseInt(id.substring(2), 10);
+                }
+                assigneeMap.set(cleanId, {
+                    id: cleanId,
+                    send_mail: sendMailSettings[id] || 'N',
+                    is_client: true
+                });
+            });
+            payload.assignees = Array.from(assigneeMap.values());
+            delete payload.clients;
             if (payload.due_date) {
                 payload.due_date = payload.due_date.format('YYYY-MM-DD');
             } else {
@@ -295,14 +324,20 @@ const TicketFormModal = ({
                     if (ticket.due_date) {
                         formattedDate = dayjs(ticket.due_date);
                     }
-                    const formattedAssignees = (ticket.assignees || []).map(a => {
-                        return typeof a === 'object' ? a.id : a;
-                    });
-
+                    const formattedAssignees = [];
+                    const formattedClients = [];
                     const initialSendMail = {};
                     (ticket.assignees || []).forEach(a => {
-                        const id = typeof a === 'object' ? a.id : a;
-                        initialSendMail[id] = a.send_mail || 'Y';
+                        const isObj = typeof a === 'object';
+                        const id = isObj ? a.id : a;
+                        const isClient = isObj ? !!a.is_client : false;
+                        const sendMail = isObj ? (a.send_mail || (isClient ? 'N' : 'Y')) : 'Y';
+                        initialSendMail[id] = sendMail;
+                        if (isClient) {
+                            formattedClients.push(id);
+                        } else {
+                            formattedAssignees.push(id);
+                        }
                     });
                     setSendMailSettings(initialSendMail);
 
@@ -317,6 +352,7 @@ const TicketFormModal = ({
                         working_hours: ticket.working_hours || null,
                         user_type: isForCustomer ? 'for_customer' : 'as_customer',
                         assignees: formattedAssignees,
+                        clients: formattedClients,
                         status_id: ticket.status_id || '',
                         type: TICKET_TYPES?.find(t => t.label === ticket?.type)?.value || 1
                     });
@@ -340,6 +376,7 @@ const TicketFormModal = ({
                     working_hours: null,
                     user_type: 'as_customer',
                     assignees: [],
+                    clients: [],
                     status_id: '',
                     type: 1
                 });
@@ -351,21 +388,34 @@ const TicketFormModal = ({
 
     const getUsersByCompanyId = async () => {
         try {
-            if (watch('project_id') === null || watch('project_id') === undefined) {
+            const selectedProjId = watch('project_id');
+            if (selectedProjId === null || selectedProjId === undefined) {
                 setUsers([]);
+                setClientsList([]);
                 return;
             }
-            const selectedCompanyId = projects?.find(p => p.value === watch('project_id'))?.company_id;
-            if (selectedCompanyId) {
-                const res = await getAllUsers(selectedCompanyId);
-                const options = res.result?.map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
-                setUsers(options || []);
+            const selectedRow = projects?.find(p => p.value === selectedProjId);
+            console.log("selectedRow", selectedRow)
+            if (selectedRow?.project_type?.toLowerCase() === "client") {
+                if (selectedRow?.company_id) {
+                    const res = await getAllUsers(selectedRow?.company_id);
+                    const options = res.result?.map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
+                    setUsers(options || []);
+                } else {
+                    setUsers([]);
+                }
             } else {
-                setUsers([]);
+                setUsers([{ label: `${selectedRow.client_name}`, value: selectedRow?.client_id }]);
             }
         } catch (err) {
             console.error("Failed to load users", err);
         }
+    }
+
+    const handleGetAllCustomer = async () => {
+        const custRes = await getCustomers();
+        const clientOpts = (custRes.result || []).map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
+        setClientsList(clientOpts);
     }
 
     useEffect(() => {
@@ -377,6 +427,7 @@ const TicketFormModal = ({
             fetchUsers();
             fetchDepartments()
             fetchStatuses();
+            handleGetAllCustomer()
         }
     }, [open]);
 
@@ -481,13 +532,13 @@ const TicketFormModal = ({
                                 </div>
                             )
                         } */}
-                        <CustomSelect
-                            name="owner_id"
-                            control={control}
-                            label="Ticket Owner"
-                            options={users}
-                        />
-                        <div className={`grid ${userData?.rolename !== "Customer" ? 'grid-cols-3' : 'grid-cols-2'} gap-4 mb-2`}>
+                        <div className={`grid grid-cols-2 gap-4 mb-2`}>
+                            <CustomSelect
+                                name="owner_id"
+                                control={control}
+                                label="Ticket Owner"
+                                options={users}
+                            />
                             {
                                 userData?.rolename !== "Customer" && (
                                     <HierarchySelect
@@ -520,7 +571,7 @@ const TicketFormModal = ({
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <DatePickerComponent requiredFiledLabel={true} setValue={setValue} control={control} name='due_date' label={`Due Date`} minDate={new Date()} maxDate={null} required={true} />
                             <HierarchySelect
                                 name="assignees"
@@ -529,12 +580,20 @@ const TicketFormModal = ({
                                 hierarchyData={hierarchyData}
                                 rules={{ validate: (value) => value && value.length > 0 || "Assign users is required" }}
                             />
+                            <CustomSelect
+                                name="clients"
+                                control={control}
+                                label="Clients"
+                                options={clientsList}
+                                multiple={true}
+                                withCheckbox={true}
+                            />
 
-                            {selectedAssigneeIds.length > 0 && (
-                                <div className="col-span-1 md:col-span-2 mt-2 p-3 bg-[#F4F5F7] border border-[#DFE1E6] rounded-lg">
+                            {combinedWatchlistIds.length > 0 && (
+                                <div className="col-span-1 md:col-span-3 mt-2 p-3 bg-[#F4F5F7] border border-[#DFE1E6] rounded-lg">
                                     <h4 className="text-sm font-bold text-[#172B4D] mb-2 uppercase tracking-wider font-sans">Watch List</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                                        {selectedAssigneeIds.map(id => {
+                                        {combinedWatchlistIds.map(id => {
                                             const name = getUserNameById(id);
                                             const isChecked = sendMailSettings[id] !== 'N';
                                             return (
