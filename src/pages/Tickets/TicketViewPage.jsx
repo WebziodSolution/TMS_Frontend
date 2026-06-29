@@ -10,10 +10,11 @@ import {
     faArrowLeft, faCalendarAlt, faClock, faFolder, faBuilding,
     faUser, faUsers, faTag, faDownload, faFileAlt, faComments,
     faPaperclip, faExclamationTriangle, faLink, faCheck, faInfoCircle,
-    faEdit, faSave, faPlay, faPause, faTasks, faHistory
+    faEdit, faSave, faPlay, faPause, faTasks, faHistory, faArrowRight
 } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import utc from 'dayjs/plugin/utc';
 import { getTicketById, updateTicket, updateAssigneeSendMail, getTicketsByProjectId } from '../../services/ticketService';
 import { getTicketComments } from '../../services/ticketCommentService';
 import { updateTicketAssignees } from '../../services/assignedTicketService';
@@ -24,11 +25,13 @@ import { connect } from 'react-redux';
 import { setAlert } from '../../redux/commonReducers/commonReducers';
 import { getUserDetails } from '../../utils/getUserDetails';
 import PermissionWrapper from '../../components/permissionWrapper/PermissionWrapper';
-import { TICKET_TYPES } from '../../utils/constants';
+import { TICKET_TYPES, TICKET_VARIFICATION } from '../../utils/constants';
 
 import { useForm, Controller } from 'react-hook-form';
 import CustomInput from '../../components/common/CustomInput';
 import CustomSelect from '../../components/common/CustomSelect';
+import CustomCheckbox from '../../components/common/CustomCheckbox';
+import CustomModalWrapper from '../../components/common/CustomModalWrapper';
 import RichTextEditor from '../../components/common/RichTextEditor';
 import DragDropAttachmentUpload from '../../components/common/DragDropAttachmentUpload';
 import HierarchySelect from '../../components/common/HierarchySelect';
@@ -37,10 +40,12 @@ import { getUserHierarchy, getAllUsers, getCustomers } from '../../services/user
 import { getAllStatuses } from '../../services/statusService';
 import { deleteTicketAttachment, uploadTicketAttachment } from '../../services/ticketAttachmentService';
 import { upsertTodayTicketWork, getTodayTicketWork } from '../../services/todayTicketWorkService';
-import { checkCurrentWork, executeTicketLogAction, getActiveTicketLogs, getTicketLogHistory } from '../../services/ticketLogService';
+import { checkCurrentWork, executeTicketLogAction, getActiveTicketLogs, getTicketLogHistory } from '../../services/ticketTimeLogService';
+import { createTicketLog, getTicketLogsByTicketId } from '../../services/ticketLogService';
 import ReasonModal from './ReasonModal';
 
 dayjs.extend(relativeTime);
+dayjs.extend(utc);
 
 const TimerDisplay = ({ timerState, initialSeconds, activeLog, clockOffset }) => {
     const [seconds, setSeconds] = useState(initialSeconds);
@@ -113,6 +118,17 @@ const TicketViewPage = ({ setAlert }) => {
     const [openHistoryModal, setOpenHistoryModal] = useState(false);
     const [historyLogs, setHistoryLogs] = useState([]);
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+    // Verification Modal States
+    const [openVerificationModal, setOpenVerificationModal] = useState(false);
+    const [isSavingVerification, setIsSavingVerification] = useState(false);
+    const [pendingSubmitPayload, setPendingSubmitPayload] = useState(null);
+
+    const verificationForm = useForm({
+        defaultValues: {
+            varification: []
+        }
+    });
 
     const clockOffsetRef = useRef(0);
 
@@ -437,9 +453,7 @@ const TicketViewPage = ({ setAlert }) => {
 
     const [sendMailSettings, setSendMailSettings] = useState({});
     const [projectTickets, setProjectTickets] = useState([]);
-    const [loadingProjectTickets, setLoadingProjectTickets] = useState(false);
     const [isSavingAssignees, setIsSavingAssignees] = useState(false);
-    const [clientsList, setClientsList] = useState([]);
 
     const selectedAssigneeIds = watch('assignees') || [];
     const selectedClientIds = watch('clients') || [];
@@ -457,7 +471,6 @@ const TicketViewPage = ({ setAlert }) => {
     useEffect(() => {
         const fetchProjectTickets = async () => {
             if (selectedProjectId) {
-                setLoadingProjectTickets(true);
                 try {
                     const res = await getTicketsByProjectId(selectedProjectId);
                     if (res.status === 200) {
@@ -473,8 +486,6 @@ const TicketViewPage = ({ setAlert }) => {
                     }
                 } catch (err) {
                     console.error("Failed to load project tickets", err);
-                } finally {
-                    setLoadingProjectTickets(false);
                 }
             } else {
                 setProjectTickets([]);
@@ -505,30 +516,6 @@ const TicketViewPage = ({ setAlert }) => {
         }
     }, [selectedAssigneeIds, selectedClientIds]);
 
-    const getUsersByCompanyId = async () => {
-        try {
-            const projId = watch('project_id');
-            const selectedCompanyId = projects.find(p => p.id === projId)?.company_id;
-            if (selectedCompanyId) {
-                const res = await getAllUsers(selectedCompanyId);
-                const options = res.result?.map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
-                setUsers(options || []);
-            } else {
-                setUsers([]);
-            }
-        } catch (err) {
-            console.error("Failed to load users", err);
-        }
-    };
-    const handleGetAllCustomer = async () => {
-        const custRes = await getCustomers();
-        const clientOpts = (custRes.result || []).map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
-        setClientsList(clientOpts);
-    }
-    useEffect(() => {
-        getUsersByCompanyId();
-    }, [watch('project_id'), projects]);
-
     const getUserNameById = (id) => {
         const findName = (nodes) => {
             for (const node of nodes) {
@@ -544,10 +531,8 @@ const TicketViewPage = ({ setAlert }) => {
         };
         const nameFromHierarchy = findName(hierarchyData);
         if (nameFromHierarchy) return nameFromHierarchy;
-        const clientObj = clientsList.find(c => String(c.value) === String(id));
+        const clientObj = users.find(c => String(c.value) === String(id));
         if (clientObj) return clientObj.label;
-        const userObj = users.find(u => String(u.value) === String(id));
-        if (userObj) return userObj.label;
         return `User ${id}`;
     };
 
@@ -572,6 +557,12 @@ const TicketViewPage = ({ setAlert }) => {
         }
     };
 
+    const handleGetAllUsers = async () => {
+        const res = await getAllUsers();
+        const options = res.result?.map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
+        setUsers(options || []);
+    }
+
     const handleStartEdit = async () => {
         if (!ticket) return;
 
@@ -581,6 +572,7 @@ const TicketViewPage = ({ setAlert }) => {
         if (statusesList.length === 0) {
             await fetchStatuses();
         }
+        await handleGetAllUsers()
 
         const formattedDate = ticket.due_date ? dayjs(ticket.due_date) : null;
         const formattedAssignees = [];
@@ -646,8 +638,34 @@ const TicketViewPage = ({ setAlert }) => {
         }
     };
 
-    const handleFormSubmit = async (data) => {
+    const executeSaveTicket = async (payload) => {
         setIsSubmitting(true);
+        try {
+            const res = await updateTicket(ticket.id, payload);
+            if (res.status !== 200) {
+                setAlert({ open: true, message: res.message || "Failed to update ticket.", type: "error" });
+                setIsSubmitting(false);
+                return;
+            }
+
+            setIsUploadingFiles(true);
+            if (attachmentRef.current) {
+                await attachmentRef.current.uploadPendingFiles(ticket.id);
+            }
+            setIsUploadingFiles(false);
+
+            setAlert({ open: true, message: "Ticket updated successfully!", type: "success" });
+            setIsEditing(false);
+            fetchData(true);
+        } catch (err) {
+            console.error(err);
+            setAlert({ open: true, message: err.message || "Failed to save ticket.", type: "error" });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleFormSubmit = async (data) => {
         try {
             const payload = {
                 ...data,
@@ -698,28 +716,60 @@ const TicketViewPage = ({ setAlert }) => {
             const selectedProject = projects.find(p => p.id === data.project_id);
             payload.project_name = selectedProject ? selectedProject.name : "";
 
-            const res = await updateTicket(ticket.id, payload);
-            if (res.status !== 200) {
-                setAlert({ open: true, message: res.message || "Failed to update ticket.", type: "error" });
-                setIsSubmitting(false);
+            const isAdmin = userData?.rolename === "Administrator" || userData?.rolename === "Admin" || userData?.role_id === 1;
+            const selectedStatusObj = statusesList.find(s => String(s.value) === String(data.status_id));
+            const selectedStatusName = selectedStatusObj ? selectedStatusObj.label : "";
+            const normalizedStatusName = selectedStatusName.trim().toLowerCase();
+
+            const isStatusChanged = String(ticket?.status_id) !== String(data.status_id);
+            const requiresVerification = !isAdmin && isStatusChanged && (normalizedStatusName === 'done' || normalizedStatusName === 'client review');
+
+            if (requiresVerification) {
+                setPendingSubmitPayload(payload);
+                const initialVerif = {};
+                TICKET_VARIFICATION.forEach(item => {
+                    initialVerif[`verif_${item.value}`] = false;
+                });
+                verificationForm.reset(initialVerif);
+                setOpenVerificationModal(true);
                 return;
             }
 
-            setIsUploadingFiles(true);
-            if (attachmentRef.current) {
-                await attachmentRef.current.uploadPendingFiles(ticket.id);
-            }
-            setIsUploadingFiles(false);
-
-            setAlert({ open: true, message: "Ticket updated successfully!", type: "success" });
-            setIsEditing(false);
-            fetchData(true);
+            await executeSaveTicket(payload);
         } catch (err) {
             console.error(err);
             setAlert({ open: true, message: err.message || "Failed to save ticket.", type: "error" });
-        } finally {
-            setIsSubmitting(false);
         }
+    };
+
+    const handleVerificationSubmit = async (verifData) => {
+        const selectedLabels = TICKET_VARIFICATION
+            .filter(item => verifData[`verif_${item.value}`])
+            .map(item => item.label);
+
+        if (selectedLabels.length === 0) {
+            setAlert({ open: true, message: "Please select at least one verification check.", type: "warning" });
+            return;
+        }
+
+        setIsSavingVerification(true);
+        try {
+            setOpenVerificationModal(false);
+            if (pendingSubmitPayload) {
+                const finalPayload = { ...pendingSubmitPayload, internal_qa: selectedLabels };
+                await executeSaveTicket(finalPayload);
+            }
+        } catch (err) {
+            console.error(err);
+            setAlert({ open: true, message: err.message || "Error storing verification.", type: "error" });
+        } finally {
+            setIsSavingVerification(false);
+        }
+    };
+
+    const handleCloseVerificationModal = () => {
+        setOpenVerificationModal(false);
+        setPendingSubmitPayload(null);
     };
 
     const handleSaveAssigneesOnly = async () => {
@@ -773,7 +823,21 @@ const TicketViewPage = ({ setAlert }) => {
     };
 
     // Copy to clipboard state
-    const [copied, setCopied] = useState(false);
+    const [ticketTimelineLogs, setTicketTimelineLogs] = useState([]);
+    const [loadingTimeline, setLoadingTimeline] = useState(false);
+
+    const fetchTimeline = async () => {
+        if (!id) return;
+        setLoadingTimeline(true);
+        try {
+            const res = await getTicketLogsByTicketId(id);
+            setTicketTimelineLogs(res.result || []);
+        } catch (err) {
+            console.error("Failed to load ticket timeline logs", err);
+        } finally {
+            setLoadingTimeline(false);
+        }
+    };
 
     const fetchData = async (showLoader = true) => {
         if (showLoader) setLoading(true);
@@ -791,6 +855,7 @@ const TicketViewPage = ({ setAlert }) => {
             setProjects(projectsRes.result || []);
             setDepartments(departmentsRes.result || []);
             setDepartmentHierarchy(hierarchyRes.result || []);
+            fetchTimeline();
         } catch (err) {
             console.error(err);
             setAlert({ open: true, message: "Failed to load ticket details.", type: "error" });
@@ -802,7 +867,6 @@ const TicketViewPage = ({ setAlert }) => {
     useEffect(() => {
         if (id) {
             fetchData();
-            handleGetAllCustomer()
         }
     }, [id]);
 
@@ -978,10 +1042,8 @@ const TicketViewPage = ({ setAlert }) => {
 
             {/* Split Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-
                 {/* Main Column */}
                 <div className="lg:col-span-2 space-y-4">
-
                     {/* Title Block */}
                     <div className="bg-white p-4 border-t-2 border-t-[#0052CC] border-x border-b border-slate-100 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05),0_10px_20px_-10px_rgba(0,0,0,0.04)] rounded-xl space-y-2.5 hover:shadow-md transition-all duration-300">
                         {isEditing ? (
@@ -1521,7 +1583,7 @@ const TicketViewPage = ({ setAlert }) => {
                                             name="clients"
                                             control={control}
                                             label=""
-                                            options={clientsList}
+                                            options={users}
                                             multiple={true}
                                             withCheckbox={true}
                                             limitTags={0}
@@ -1874,6 +1936,124 @@ const TicketViewPage = ({ setAlert }) => {
                 </div>
             </div>
 
+            {/* Ticket Timeline History Card */}
+            {
+                ticketTimelineLogs?.length > 0 && (
+                    <Paper className="w-auto border border-slate-100 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05),0_10px_20px_-10px_rgba(0,0,0,0.04)] rounded-xl bg-white p-4 space-y-4 hover:shadow-md transition-all duration-300">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6.5 h-6.5 rounded-lg bg-blue-50 text-[#0052CC] flex items-center justify-center flex-shrink-0">
+                                    <FontAwesomeIcon icon={faHistory} size="xs" />
+                                </div>
+                                <span className="font-semibold text-slate-800 text-xs tracking-wider uppercase">
+                                    Activity & History ({ticketTimelineLogs.length})
+                                </span>
+                            </div>
+                            <Tooltip title="Refresh History">
+                                <IconButton size="small" onClick={fetchTimeline} className="w-6 h-6 text-slate-400 hover:text-blue-600 rounded transition-colors">
+                                    <FontAwesomeIcon icon={faHistory} size="xs" />
+                                </IconButton>
+                            </Tooltip>
+                        </div>
+
+                        <div className='max-h-72 overflow-auto'>
+                            <div className="relative border-l-2 border-slate-100 ml-3 pl-4 space-y-4 py-2">
+                                {ticketTimelineLogs.map((log) => {
+                                    let localDate = null;
+                                    if (log.created_date) {
+                                        let cleanStr = String(log.created_date);
+                                        if (!cleanStr.endsWith('Z') && !cleanStr.includes('+')) {
+                                            cleanStr = cleanStr.replace(' ', 'T') + 'Z';
+                                        }
+                                        localDate = dayjs.utc(cleanStr).local();
+                                    }
+                                    const formattedTime = localDate ? localDate.format('MMM D, YYYY h:mm A') : '-';
+                                    const timeAgo = localDate ? localDate.fromNow() : '';
+
+                                    return (
+                                        <div key={log.id} className="relative group">
+                                            {/* Dot */}
+                                            <div className="absolute -left-[23px] top-1.5 w-3 h-3 rounded-full bg-[#0052CC] border-2 border-white ring-2 ring-slate-100 group-hover:scale-125 transition-transform" />
+
+                                            <div className="space-y-2 bg-slate-50/50 hover:bg-slate-50 p-3 rounded-xl border border-slate-100 transition-all">
+                                                {/* User & Timestamp */}
+                                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <Avatar sx={{ width: 22, height: 22, fontSize: '0.65rem', bgcolor: '#0052CC' }}>
+                                                            {log.user_name ? log.user_name.charAt(0).toUpperCase() : 'U'}
+                                                        </Avatar>
+                                                        <span className="font-semibold text-xs text-slate-700">
+                                                            {log.user_name}
+                                                        </span>
+                                                    </div>
+                                                    <Tooltip title={formattedTime}>
+                                                        <span className="text-[11px] text-slate-400 font-medium">
+                                                            {timeAgo} ({formattedTime})
+                                                        </span>
+                                                    </Tooltip>
+                                                </div>
+
+                                                {/* Status Transition */}
+                                                {(log.status_id || log.new_status_name) && (
+                                                    <div className="flex items-center gap-2 text-xs pt-1 flex-wrap">
+                                                        <span className="text-slate-500 font-medium">Status:</span>
+                                                        {log.old_status_name && (
+                                                            <>
+                                                                <span className="line-through text-slate-400 font-medium">
+                                                                    {log.old_status_name}
+                                                                </span>
+                                                                <FontAwesomeIcon icon={faArrowRight} size="xs" className="text-slate-400" />
+                                                            </>
+                                                        )}
+                                                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-[#0052CC] border border-blue-200">
+                                                            {log.new_status_name || `Status #${log.status_id}`}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                {/* Due Date Transition */}
+                                                {(log.new_due_date || log.old_due_date) && (
+                                                    <div className="flex items-center gap-2 text-xs pt-1 flex-wrap">
+                                                        <span className="text-slate-500 font-medium">Due Date:</span>
+                                                        {log.old_due_date && (
+                                                            <>
+                                                                <span className="line-through text-slate-400 font-medium">
+                                                                    {dayjs(log.old_due_date).format('MMM D, YYYY')}
+                                                                </span>
+                                                                <FontAwesomeIcon icon={faArrowRight} size="xs" className="text-slate-400" />
+                                                            </>
+                                                        )}
+                                                        <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[11px]">
+                                                            {log.new_due_date ? dayjs(log.new_due_date).format('MMM D, YYYY') : '-'}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                {/* Internal QA Checks */}
+                                                {Array.isArray(log.internal_qa) && log.internal_qa.length > 0 && (
+                                                    <div className="pt-2 border-t border-slate-200/60 space-y-1.5">
+                                                        <span className="text-[11px] font-medium text-slate-500 block flex items-center gap-1">
+                                                            <FontAwesomeIcon icon={faCheck} size="xs" className="text-emerald-500" /> Verification Checks Completed:
+                                                        </span>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {log.internal_qa.map((qa, idx) => (
+                                                                <span key={idx} className="bg-white text-slate-700 border border-slate-200 px-2 py-0.5 rounded-md text-[10px] font-medium shadow-2xs">
+                                                                    {qa}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </Paper>
+                )
+            }
+
             {/* Reason Dialog Modal */}
             <ReasonModal
                 open={openReasonModal}
@@ -1989,6 +2169,33 @@ const TicketViewPage = ({ setAlert }) => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Ticket Verification Modal */}
+            <CustomModalWrapper
+                open={openVerificationModal}
+                onClose={handleCloseVerificationModal}
+                title="Ticket Verification"
+                onSubmit={verificationForm.handleSubmit(handleVerificationSubmit)}
+                isSubmitting={isSavingVerification}
+                submitText="Submit & Save Ticket"
+                maxWidth="md"
+            >
+                <div className="space-y-4">
+                    <p className="text-slate-600 mb-4 font-medium text-sm" >
+                        Please select the verification checks performed for this ticket before status update.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4">
+                        {TICKET_VARIFICATION.map((item) => (
+                            <CustomCheckbox
+                                key={item.value}
+                                name={`verif_${item.value}`}
+                                control={verificationForm.control}
+                                label={item.label}
+                            />
+                        ))}
+                    </div>
+                </div>
+            </CustomModalWrapper>
         </div>
     );
 };

@@ -10,6 +10,8 @@ export const roleURL = `${baseURL}/roles`;
 export const companyURL = `${baseURL}/companies`;
 export const reportURL = `${baseURL}/reports`;
 export const assigneesURL = `${baseURL}/assigned-tickets`;
-export const ticketLogURL = `${baseURL}/ticket_logs`;
+export const ticketLogURL = `${baseURL}/ticket_time_log`;
+export const ticketChangeLogURL = `${baseURL}/ticket_log`;
 export const worklogURL = `${baseURL}/worklog`;
+export const ticketVarificationURL = `${baseURL}/ticket_varifications`;
 

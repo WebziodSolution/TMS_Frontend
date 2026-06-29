@@ -12,3 +12,17 @@ export const TICKET_TYPES = [
     { value: 2, label: 'Bug' },
     { value: 3, label: 'Redevelopment' }
 ];
+
+export const TICKET_VARIFICATION = [
+    { value: 1, label: 'Grammar' },
+    { value: 2, label: 'Brand Voice' },
+    { value: 3, label: 'SEO' },
+    { value: 4, label: 'Legal' },
+    { value: 5, label: 'Spelling' },
+    { value: 6, label: 'Links Tested' },
+    { value: 7, label: 'Images Correct' },
+    { value: 8, label: 'Accessibility' },
+    { value: 9, label: 'Tracking Pixels' },
+    { value: 10, label: 'Browser Compatibility' },
+    { value: 11, label: 'None' }
+]

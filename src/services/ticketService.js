@@ -60,9 +60,11 @@ export const deleteTicket = async (id) => {
     }
 };
 
-export const updateTicketStatus = async (id, statusId) => {
+export const updateTicketStatus = async (id, statusId, internalQa = null) => {
     try {
-        const response = await axiosInterceptor.patch(`/tickets/${id}/status`, { status_id: statusId });
+        const payload = { status_id: statusId };
+        if (internalQa) payload.internal_qa = internalQa;
+        const response = await axiosInterceptor.patch(`/tickets/${id}/status`, payload);
         return response.data;
     } catch (error) {
         console.error(`Error updating ticket status ${id}:`, error);

@@ -60,8 +60,6 @@ const TicketFormModal = ({
     const [statusesList, setStatusesList] = useState([]);
     const [sendMailSettings, setSendMailSettings] = useState({});
     const [projectTickets, setProjectTickets] = useState([]);
-    const [loadingProjectTickets, setLoadingProjectTickets] = useState(false);
-    const [clientsList, setClientsList] = useState([]);
 
     const selectedAssigneeIds = watch('assignees') || [];
     const selectedClientIds = watch('clients') || [];
@@ -79,7 +77,6 @@ const TicketFormModal = ({
     useEffect(() => {
         const fetchProjectTickets = async () => {
             if (selectedProjectId) {
-                setLoadingProjectTickets(true);
                 try {
                     const res = await getTicketsByProjectId(selectedProjectId);
                     if (res.status === 200) {
@@ -95,8 +92,6 @@ const TicketFormModal = ({
                     }
                 } catch (err) {
                     console.error("Failed to load project tickets", err);
-                } finally {
-                    setLoadingProjectTickets(false);
                 }
             } else {
                 setProjectTickets([]);
@@ -142,10 +137,8 @@ const TicketFormModal = ({
         };
         const nameFromHierarchy = findName(hierarchyData);
         if (nameFromHierarchy) return nameFromHierarchy;
-        const clientObj = clientsList.find(c => String(c.value) === String(id));
+        const clientObj = users.find(c => String(c.value) === String(id));
         if (clientObj) return clientObj.label;
-        const userObj = users.find(u => String(u.value) === String(id));
-        if (userObj) return userObj.label;
         return `User ${id}`;
     };
 
@@ -386,36 +379,10 @@ const TicketFormModal = ({
         }
     }
 
-    const getUsersByCompanyId = async () => {
-        try {
-            const selectedProjId = watch('project_id');
-            if (selectedProjId === null || selectedProjId === undefined) {
-                setUsers([]);
-                setClientsList([]);
-                return;
-            }
-            const selectedRow = projects?.find(p => p.value === selectedProjId);
-            console.log("selectedRow", selectedRow)
-            if (selectedRow?.project_type?.toLowerCase() === "client") {
-                if (selectedRow?.company_id) {
-                    const res = await getAllUsers(selectedRow?.company_id);
-                    const options = res.result?.map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
-                    setUsers(options || []);
-                } else {
-                    setUsers([]);
-                }
-            } else {
-                setUsers([{ label: `${selectedRow.client_name}`, value: selectedRow?.client_id }]);
-            }
-        } catch (err) {
-            console.error("Failed to load users", err);
-        }
-    }
-
-    const handleGetAllCustomer = async () => {
-        const custRes = await getCustomers();
-        const clientOpts = (custRes.result || []).map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
-        setClientsList(clientOpts);
+    const handleGetAllUsers = async () => {
+        const res = await getAllUsers();
+        const options = res.result?.map(u => ({ label: `${u.first_name} ${u.last_name}`, value: u.id }));
+        setUsers(options || []);
     }
 
     useEffect(() => {
@@ -423,11 +390,11 @@ const TicketFormModal = ({
             setValue("user_type", "for_customer");
         }
         if (open) {
+            handleGetAllUsers()
             fetchProjects();
             fetchUsers();
             fetchDepartments()
             fetchStatuses();
-            handleGetAllCustomer()
         }
     }, [open]);
 
@@ -435,9 +402,6 @@ const TicketFormModal = ({
         getTicketDetails()
     }, [editingTicketId, open, projectId]);
 
-    useEffect(() => {
-        getUsersByCompanyId();
-    }, [watch('project_id')]);
 
     return (
         <CustomModalWrapper
@@ -584,7 +548,7 @@ const TicketFormModal = ({
                                 name="clients"
                                 control={control}
                                 label="Clients"
-                                options={clientsList}
+                                options={users}
                                 multiple={true}
                                 withCheckbox={true}
                             />
