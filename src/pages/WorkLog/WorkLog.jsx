@@ -17,6 +17,7 @@ import { getWorkLogs } from '../../services/worklogService';
 import { connect } from 'react-redux';
 import { setAlert } from '../../redux/commonReducers/commonReducers';
 import { getUserDetails } from '../../utils/getUserDetails';
+import CustomModalWrapper from '../../components/common/CustomModalWrapper';
 
 const formatLocalTime = (utcTimeString) => {
     if (!utcTimeString) return 'N/A';
@@ -49,6 +50,8 @@ const WorkLog = ({ setAlert }) => {
     const [worklogData, setWorklogData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [expandedUsers, setExpandedUsers] = useState({});
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [modalOpen, setModalOpen] = useState(false);
 
     const fetchLogs = async (startStr, endStr) => {
         setLoading(true);
@@ -96,6 +99,16 @@ const WorkLog = ({ setAlert }) => {
             ...prev,
             [userId]: !prev[userId]
         }));
+    };
+
+    const handleOpenNotes = (ticket) => {
+        setSelectedTicket(ticket);
+        setModalOpen(true);
+    };
+
+    const handleCloseNotes = () => {
+        setSelectedTicket(null);
+        setModalOpen(false);
     };
 
     if (!isAuthorized) {
@@ -181,9 +194,12 @@ const WorkLog = ({ setAlert }) => {
                             </td>
                             {index === 0 && (
                                 <td rowSpan={ticket.logs.length} className="px-6 py-4.5 whitespace-nowrap text-sm font-bold text-[#172B4D] text-center align-middle">
-                                    {ticket.notes ? (
-                                        <Tooltip title={ticket.notes} arrow placement="bottom">
-                                            <span className="text-[#0052CC] hover:text-[#0747A6] cursor-pointer">
+                                    {ticket.notes && ticket.notes.length > 0 ? (
+                                        <Tooltip title="View Notes" arrow placement="bottom">
+                                            <span
+                                                className="text-[#0052CC] hover:text-[#0747A6] cursor-pointer"
+                                                onClick={() => handleOpenNotes(ticket)}
+                                            >
                                                 <FontAwesomeIcon icon={faStickyNote} size="lg" />
                                             </span>
                                         </Tooltip>
@@ -368,6 +384,63 @@ const WorkLog = ({ setAlert }) => {
                     )}
                 </>
             )}
+
+            {/* Notes Modal */}
+            <CustomModalWrapper
+                open={modalOpen}
+                onClose={handleCloseNotes}
+                title={`Notes for ${selectedTicket?.ticket_no || ''}`}
+                showFooter={false}
+                maxWidth="md"
+            >
+                {selectedTicket && (
+                    <div className="space-y-6">
+                        <div className="border-b border-[#DFE1E6] pb-3 mb-4">
+                            <h4 className="text-base font-semibold text-[#172B4D]">
+                                {selectedTicket.ticket_name}
+                            </h4>
+                            <p className="text-xs text-[#5E6C84] mt-1">
+                                Project: <span className="font-semibold text-violet-700">{selectedTicket.project_name}</span> | Total Worked: <span className="font-semibold text-[#172B4D]">{selectedTicket.worked_time}</span>
+                            </p>
+                        </div>
+                        
+                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                            {Object.entries(
+                                selectedTicket.notes?.reduce((acc, item) => {
+                                    const dateLabel = dayjs(item.date).format('MMMM DD, YYYY');
+                                    if (!acc[dateLabel]) acc[dateLabel] = [];
+                                    acc[dateLabel].push(item.note);
+                                    return acc;
+                                }, {}) || {}
+                            ).map(([dateLabel, notesList]) => (
+                                <div key={dateLabel} className="bg-[#FAFBFC] border border-[#DFE1E6] rounded-xl p-4 space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-[#0052CC] bg-[#E9F2FF] px-2.5 py-1 rounded-md">
+                                            {dateLabel}
+                                        </span>
+                                        <span className="text-[11px] text-[#5E6C84] font-medium">
+                                            {notesList.length} {notesList.length === 1 ? 'entry' : 'entries'}
+                                        </span>
+                                    </div>
+                                    <div className="divide-y divide-[#DFE1E6]">
+                                        {notesList.map((note, idx) => (
+                                            <div key={idx} className="py-2 first:pt-1 last:pb-1 text-sm text-[#172B4D] whitespace-pre-line leading-relaxed">
+                                                {note}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            
+                            {(!selectedTicket.notes || selectedTicket.notes.length === 0) && (
+                                <div className="text-center py-8 text-[#5E6C84] text-sm italic">
+                                    No notes found for this ticket.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </CustomModalWrapper>
         </div>
     );
 };
