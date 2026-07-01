@@ -63,7 +63,7 @@ const CommentSection = ({ ticketId, setAlert, setLoading, loading, onCommentsCou
             <div>
                 {/* New Comment Creator */}
                 {
-                    <div className="space-y-2 h-96 overflow-y-auto">
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
                         {comments?.map(comment => (
                             <CommentItem
                                 key={comment.id}
