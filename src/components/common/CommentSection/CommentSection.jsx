@@ -46,7 +46,7 @@ const CommentSection = ({ ticketId, setAlert, setLoading, loading, onCommentsCou
         setValue('comment_type_id', defaultType);
         fetchComments();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [setValue]);
+    }, []);
 
     if (!ticketId) {
         return (

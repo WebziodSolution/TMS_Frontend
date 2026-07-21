@@ -51,7 +51,6 @@ const CommentEditor = ({
     const [isUploadingFiles, setIsUploadingFiles] = useState(false);
 
     const handleFormSubmit = async (data) => {
-        console.log(data)
         if (isHtmlEmpty(data.comment) && (!attachmentRef.current || attachmentRef.current.getPendingCount() === 0)) {
             setAlert({
                 open: true,
@@ -117,7 +116,7 @@ const CommentEditor = ({
 
     useEffect(() => {
         setValue('comment_type_id', initialVisibility);
-    }, [initialVisibility, setValue]);
+    }, [initialVisibility]);
 
     return (
         <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col gap-3 w-full animate-fade-in">
