@@ -7,7 +7,7 @@ export const updateUserProfile = async (id, data) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating user profile ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -17,6 +17,6 @@ export const changePassword = async (data) => {
         return response.data;
     } catch (error) {
         console.error("Error changing password:", error);
-        throw error;
+        
     }
 };

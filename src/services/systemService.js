@@ -6,6 +6,6 @@ export const getNavigationMenu = async (email) => {
         return response.data;
     } catch (error) {
         console.error("Error fetching navigation menu:", error);
-        throw error;
+        
     }
 };

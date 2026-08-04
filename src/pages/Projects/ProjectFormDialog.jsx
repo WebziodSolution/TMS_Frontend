@@ -103,11 +103,22 @@ const ProjectFormDialog = ({
     const handleFormSubmit = async (data) => {
         setIsSubmitting(true);
         try {
+            let res;
             if (editingProjectId) {
-                await updateProject(editingProjectId, data);
+                res = await updateProject(editingProjectId, data);
             } else {
-                await addProject(data);
+                res = await addProject(data);
             }
+
+            if (res?.status !== 200 && res?.status !== 201) {
+                setAlert({
+                    open: true,
+                    message: res?.message || `Failed to ${editingProjectId ? 'update' : 'create'} project.`,
+                    type: "error"
+                });
+                return;
+            }
+
             setAlert({
                 open: true,
                 message: `Project ${editingProjectId ? 'updated' : 'created'} successfully!`,

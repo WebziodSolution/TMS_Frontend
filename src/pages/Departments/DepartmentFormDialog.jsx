@@ -77,11 +77,22 @@ const DepartmentFormDialog = ({
             parent_department_id: (data.parent_department_id === "" || data.parent_department_id === null || data.parent_department_id === undefined) ? null : data.parent_department_id,
         }
         try {
+            let res;
             if (editingDepartmentId) {
-                await updateDepartment(editingDepartmentId, payload);
+                res = await updateDepartment(editingDepartmentId, payload);
             } else {
-                await addDepartment(payload);
+                res = await addDepartment(payload);
             }
+
+            if (res?.status !== 200 && res?.status !== 201) {
+                setAlert({
+                    open: true,
+                    message: res?.message || `Failed to ${editingDepartmentId ? 'update' : 'create'} department.`,
+                    type: "error"
+                });
+                return;
+            }
+
             setAlert({
                 open: true,
                 message: `Department ${editingDepartmentId ? 'updated' : 'created'} successfully!`,

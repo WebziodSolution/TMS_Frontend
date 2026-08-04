@@ -6,7 +6,7 @@ export const upsertTodayTicketWork = async (data) => {
         return response.data;
     } catch (error) {
         console.error("Error saving today's ticket work log:", error);
-        throw error;
+        
     }
 };
 
@@ -20,6 +20,6 @@ export const getTodayTicketWork = async (userId, ticketId, date = '') => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching today's ticket work log for user ${userId} and ticket ${ticketId}:`, error);
-        throw error;
+        
     }
 };

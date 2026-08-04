@@ -7,7 +7,7 @@ export const addTicketVarification = async (data) => {
         return response.data;
     } catch (error) {
         console.error("Error adding ticket verification:", error);
-        throw error;
+        
     }
 };
 
@@ -17,7 +17,7 @@ export const getAllTicketVarifications = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all ticket verifications:", error);
-        throw error;
+        
     }
 };
 
@@ -27,7 +27,7 @@ export const getTicketVarificationsByTicketId = async (ticketId) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching verifications for ticket ${ticketId}:`, error);
-        throw error;
+        
     }
 };
 
@@ -37,7 +37,7 @@ export const updateTicketVarification = async (id, data) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating ticket verification ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -47,6 +47,6 @@ export const deleteTicketVarification = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting ticket verification ${id}:`, error);
-        throw error;
+        
     }
 };

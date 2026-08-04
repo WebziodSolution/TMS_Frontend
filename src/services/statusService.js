@@ -7,7 +7,7 @@ export const getAllStatuses = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all statuses:", error);
-        throw error;
+        
     }
 };
 
@@ -17,27 +17,39 @@ export const getStatusById = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching status ${id}:`, error);
-        throw error;
+        
     }
 };
 
 export const addStatus = async (data) => {
     try {
         const response = await axiosInterceptor.post(statusURL, data);
-        return response.data;
+        return {
+            ...response.data,
+            status: response.status
+        };
     } catch (error) {
         console.error("Error adding status:", error);
-        throw error;
+        return {
+            status: error.response?.status || 500,
+            message: error.response?.data?.message || error.message || "Failed to add status."
+        };
     }
 };
 
 export const updateStatus = async (id, data) => {
     try {
         const response = await axiosInterceptor.put(`${statusURL}/${id}`, data);
-        return response.data;
+        return {
+            ...response.data,
+            status: response.status
+        };
     } catch (error) {
         console.error(`Error updating status ${id}:`, error);
-        throw error;
+        return {
+            status: error.response?.status || 500,
+            message: error.response?.data?.message || error.message || `Failed to update status ${id}.`
+        };
     }
 };
 
@@ -47,6 +59,6 @@ export const deleteStatus = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting status ${id}:`, error);
-        throw error;
+        
     }
 };

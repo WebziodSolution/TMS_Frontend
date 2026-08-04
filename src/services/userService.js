@@ -8,7 +8,7 @@ export const getUserHierarchy = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching user hierarchy:", error);
-        throw error;
+        
     }
 };
 
@@ -19,7 +19,7 @@ export const getAllUsers = async (companyId = null) => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all users:", error);
-        throw error;
+        
     }
 };
 
@@ -29,27 +29,39 @@ export const getUserById = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching user ${id}:`, error);
-        throw error;
+        
     }
 };
 
 export const addUser = async (data) => {
     try {
         const response = await axiosInterceptor.post(userURL, data);
-        return response.data;
+        return {
+            ...response.data,
+            status: response.status
+        };
     } catch (error) {
         console.error("Error adding user:", error);
-        throw error;
+        return {
+            status: error.response?.status || 500,
+            message: error.response?.data?.message || error.message || "Failed to add user."
+        };
     }
 };
 
 export const updateUser = async (id, data) => {
     try {
         const response = await axiosInterceptor.put(`${userURL}/${id}`, data);
-        return response.data;
+        return {
+            ...response.data,
+            status: response.status
+        };
     } catch (error) {
         console.error(`Error updating user ${id}:`, error);
-        throw error;
+        return {
+            status: error.response?.status || 500,
+            message: error.response?.data?.message || error.message || `Failed to update user ${id}.`
+        };
     }
 };
 
@@ -59,7 +71,7 @@ export const deleteUser = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting user ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -70,7 +82,7 @@ export const getCustomers = async (companyId = null) => {
         return response.data;
     } catch (error) {
         console.error("Error fetching customers:", error);
-        throw error;
+        
     }
 };
 
@@ -80,7 +92,7 @@ export const getNonCustomers = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching non-customers:", error);
-        throw error;
+        
     }
 };
 
@@ -90,7 +102,7 @@ export const getAllAdmins = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching admins:", error);
-        throw error;
+        
     }
 };
 
@@ -113,7 +125,7 @@ export const filterUsers = async (roleIds, companyIds) => {
         return response.data;
     } catch (error) {
         console.error("Error filtering users:", error);
-        throw error;
+        
     }
 };
 
@@ -123,6 +135,6 @@ export const sendUserCredentials = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error sending credentials to user ${id}:`, error);
-        throw error;
+        
     }
 };

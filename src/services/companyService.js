@@ -7,7 +7,7 @@ export const getAllCompanies = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all companies:", error);
-        throw error;
+        
     }
 };
 
@@ -17,7 +17,7 @@ export const getCompanyById = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching company ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -29,7 +29,7 @@ export const createCompany = async (formData) => {
         return response.data;
     } catch (error) {
         console.error("Error creating company:", error);
-        throw error;
+        
     }
 };
 
@@ -41,7 +41,7 @@ export const updateCompany = async (id, formData) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating company ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -51,7 +51,7 @@ export const deleteCompany = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting company ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -61,6 +61,6 @@ export const getAllCompaniesWithUsers = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all companies with users:", error);
-        throw error;
+        
     }
 };

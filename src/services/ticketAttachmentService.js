@@ -10,7 +10,7 @@ export const uploadTicketAttachment = async (id, formData) => {
         return response.data;
     } catch (error) {
         console.error("Error uploading ticket attachment:", error);
-        throw error;
+        
     }
 };
 
@@ -20,6 +20,6 @@ export const deleteTicketAttachment = async (ticketId, attachmentId) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting ticket attachment ${attachmentId}:`, error);
-        throw error;
+        
     }
 };

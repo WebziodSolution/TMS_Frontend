@@ -142,15 +142,26 @@ const UserFormDialog = ({
                 submitData.work_hours = parseFloat(submitData.work_hours);
             }
 
+            let res;
             if (editingUserId) {
                 const updateData = { ...submitData };
                 if (!updateData.password) {
                     delete updateData.password;
                 }
-                await updateUser(editingUserId, updateData);
+                res = await updateUser(editingUserId, updateData);
             } else {
-                await addUser(submitData);
+                res = await addUser(submitData);
             }
+
+            if (res?.status !== 200 && res?.status !== 201) {
+                setAlert({
+                    open: true,
+                    message: res?.message || `Failed to ${editingUserId ? 'update' : 'create'} user.`,
+                    type: "error"
+                });
+                return;
+            }
+
             setAlert({
                 open: true,
                 message: `User ${editingUserId ? 'updated' : 'created'} successfully!`,

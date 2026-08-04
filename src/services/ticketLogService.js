@@ -7,7 +7,7 @@ export const createTicketLog = async (data) => {
         return response.data;
     } catch (error) {
         console.error("Error creating ticket log:", error);
-        throw error;
+        
     }
 };
 
@@ -17,7 +17,7 @@ export const getAllTicketLogs = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all ticket logs:", error);
-        throw error;
+        
     }
 };
 
@@ -27,7 +27,7 @@ export const getTicketLogsByTicketId = async (ticketId) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching ticket logs for ticket ${ticketId}:`, error);
-        throw error;
+        
     }
 };
 
@@ -37,7 +37,7 @@ export const updateTicketLog = async (id, data) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating ticket log ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -47,6 +47,6 @@ export const deleteTicketLog = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting ticket log ${id}:`, error);
-        throw error;
+        
     }
 };

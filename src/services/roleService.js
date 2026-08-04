@@ -7,7 +7,7 @@ export const getAllRoles = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all roles:", error);
-        throw error;
+        
     }
 };
 
@@ -17,7 +17,7 @@ export const getRoleById = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching role ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -27,7 +27,7 @@ export const getRolePermissions = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching permissions for role ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -37,7 +37,7 @@ export const getAllActions = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all actions:", error);
-        throw error;
+        
     }
 };
 
@@ -47,7 +47,7 @@ export const createRole = async (data) => {
         return response.data;
     } catch (error) {
         console.error("Error creating role:", error);
-        throw error;
+        
     }
 };
 
@@ -57,7 +57,7 @@ export const updateRole = async (id, data) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating role ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -67,6 +67,6 @@ export const deleteRole = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting role ${id}:`, error);
-        throw error;
+        
     }
 };

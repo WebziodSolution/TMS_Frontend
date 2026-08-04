@@ -6,7 +6,7 @@ export const filterTickets = async (filter) => {
         return response.data;
     } catch (error) {
         console.error("Error filtering tickets:", error);
-        throw error;
+        
     }
 };
 
@@ -16,7 +16,7 @@ export const getAllTickets = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all tickets:", error);
-        throw error;
+        
     }
 };
 
@@ -26,7 +26,7 @@ export const getTicketById = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching ticket ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -36,7 +36,7 @@ export const addTicket = async (data) => {
         return response.data;
     } catch (error) {
         console.error("Error adding ticket:", error);
-        throw error;
+        
     }
 };
 
@@ -46,7 +46,7 @@ export const updateTicket = async (id, data) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating ticket ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -56,7 +56,7 @@ export const deleteTicket = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting ticket ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -68,7 +68,7 @@ export const updateTicketStatus = async (id, statusId, internalQa = null) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating ticket status ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -78,7 +78,7 @@ export const updateTicketTitle = async (id, title) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating ticket title ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -91,7 +91,7 @@ export const updateAssigneeSendMail = async (ticketId, userId, sendMail) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating assignee send mail settings for ticket ${ticketId}:`, error);
-        throw error;
+        
     }
 };
 
@@ -101,7 +101,7 @@ export const getTicketsByProjectId = async (projectId) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching tickets for project ${projectId}:`, error);
-        throw error;
+        
     }
 };
 
@@ -111,6 +111,6 @@ export const closeOrReopenTicket = async (ticketId, statusId = null) => {
         return response.data;
     } catch (error) {
         console.error(`Error closing/reopening ticket ${ticketId}:`, error);
-        throw error;
+        
     }
 };

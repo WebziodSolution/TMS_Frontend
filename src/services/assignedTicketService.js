@@ -7,6 +7,6 @@ export const updateTicketAssignees = async (ticketId, data) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating assigned tickets for ticket ${ticketId}:`, error);
-        throw error;
+        
     }
 };

@@ -7,7 +7,7 @@ export const getAllProjects = async () => {
         return response.data;
     } catch (error) {
         console.error("Error fetching all projects:", error);
-        throw error;
+        
     }
 };
 
@@ -17,27 +17,39 @@ export const getProjectById = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching project ${id}:`, error);
-        throw error;
+        
     }
 };
 
 export const addProject = async (data) => {
     try {
         const response = await axiosInterceptor.post(projectURL, data);
-        return response.data;
+        return {
+            ...response.data,
+            status: response.status
+        };
     } catch (error) {
         console.error("Error adding project:", error);
-        throw error;
+        return {
+            status: error.response?.status || 500,
+            message: error.response?.data?.message || error.message || "Failed to add project."
+        };
     }
 };
 
 export const updateProject = async (id, data) => {
     try {
         const response = await axiosInterceptor.put(`${projectURL}/${id}`, data);
-        return response.data;
+        return {
+            ...response.data,
+            status: response.status
+        };
     } catch (error) {
         console.error(`Error updating project ${id}:`, error);
-        throw error;
+        return {
+            status: error.response?.status || 500,
+            message: error.response?.data?.message || error.message || `Failed to update project ${id}.`
+        };
     }
 };
 
@@ -47,7 +59,7 @@ export const deleteProject = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting project ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -57,7 +69,7 @@ export const addToWatchlist = async (projectId) => {
         return response.data;
     } catch (error) {
         console.error(`Error adding project ${projectId} to watchlist:`, error);
-        throw error;
+        
     }
 };
 
@@ -67,7 +79,7 @@ export const removeFromWatchlist = async (projectId) => {
         return response.data;
     } catch (error) {
         console.error(`Error removing project ${projectId} from watchlist:`, error);
-        throw error;
+        
     }
 };
 

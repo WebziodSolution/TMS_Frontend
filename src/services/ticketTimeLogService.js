@@ -8,7 +8,7 @@ export const executeTicketLogAction = async (ticketId, action, note = null) => {
         return response.data;
     } catch (error) {
         console.error(`Error executing ticket log action "${action}":`, error);
-        throw error;
+        
     }
 };
 
@@ -18,7 +18,7 @@ export const getActiveTicketLogs = async (ticketId) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching active ticket logs for ticket ${ticketId}:`, error);
-        throw error;
+        
     }
 };
 
@@ -28,7 +28,7 @@ export const getTicketLogHistory = async (ticketId) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching ticket log history for ticket ${ticketId}:`, error);
-        throw error;
+        
     }
 };
 
@@ -40,7 +40,7 @@ export const createTicketLog = async (data) => {
         return response.data;
     } catch (error) {
         console.error("Error creating ticket log:", error);
-        throw error;
+        
     }
 };
 
@@ -50,7 +50,7 @@ export const getTicketLog = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching ticket log ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -60,7 +60,7 @@ export const updateTicketLog = async (id, data) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating ticket log ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -70,7 +70,7 @@ export const deleteTicketLog = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting ticket log ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -80,6 +80,6 @@ export const checkCurrentWork = async () => {
         return response.data;
     } catch (error) {
         console.error(`Error checking current work:`, error);
-        throw error;
+        
     }
 };

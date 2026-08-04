@@ -6,7 +6,7 @@ export const getTicketComments = async (ticketId) => {
         return response.data;
     } catch (error) {
         console.error(`Error fetching comments for ticket ${ticketId}:`, error);
-        throw error;
+        
     }
 };
 
@@ -16,7 +16,7 @@ export const addTicketComment = async (data) => {
         return response.data;
     } catch (error) {
         console.error("Error adding comment:", error);
-        throw error;
+        
     }
 };
 
@@ -26,7 +26,7 @@ export const updateTicketComment = async (id, data) => {
         return response.data;
     } catch (error) {
         console.error(`Error updating comment ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -36,7 +36,7 @@ export const deleteTicketComment = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting comment ${id}:`, error);
-        throw error;
+        
     }
 };
 
@@ -50,7 +50,7 @@ export const uploadCommentAttachment = async (commentId, formData) => {
         return response.data;
     } catch (error) {
         console.error(`Error uploading attachment for comment ${commentId}:`, error);
-        throw error;
+        
     }
 };
 
@@ -60,6 +60,6 @@ export const deleteCommentAttachment = async (commentId, attachmentId) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting attachment ${attachmentId}:`, error);
-        throw error;
+        
     }
 };

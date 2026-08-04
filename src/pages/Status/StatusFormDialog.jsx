@@ -52,23 +52,34 @@ const StatusFormDialog = ({
     const handleFormSubmit = async (data) => {
         setIsSubmitting(true);
         try {
+            let res;
             if (editingStatusId) {
-                await updateStatus(editingStatusId, data);
+                res = await updateStatus(editingStatusId, data);
             } else {
-                await addStatus(data);
+                res = await addStatus(data);
             }
+
+            if (res?.status !== 200 && res?.status !== 201) {
+                setAlert({
+                    open: true,
+                    message: res?.message || `Failed to ${editingStatusId ? 'update' : 'create'} status.`,
+                    type: "error"
+                });
+                return;
+            }
+
             if (onSuccess) onSuccess();
-            setAlert({ 
-                open: true, 
-                message: `Status ${editingStatusId ? 'updated' : 'created'} successfully!`, 
-                type: "success" 
+            setAlert({
+                open: true,
+                message: `Status ${editingStatusId ? 'updated' : 'created'} successfully!`,
+                type: "success"
             });
         } catch (err) {
             console.error(err);
-            setAlert({ 
-                open: true, 
-                message: err.message || "Failed to save status.", 
-                type: "error" 
+            setAlert({
+                open: true,
+                message: err.message || "Failed to save status.",
+                type: "error"
             });
         } finally {
             setIsSubmitting(false);

@@ -6,7 +6,7 @@ export const getDailyReport = async (date) => {
         return response.data;
     } catch (error) {
         console.error("Error fetching daily report:", error);
-        throw error;
+        
     }
 };
 
@@ -16,7 +16,7 @@ export const getMonthlyReport = async (startDate, endDate, groupBy = "ticket") =
         return response.data;
     } catch (error) {
         console.error("Error fetching monthly report:", error);
-        throw error;
+        
     }
 };
 
@@ -29,7 +29,7 @@ export const exportMonthlyReportExcel = async (startDate, endDate, groupBy = "ti
         return response.data;
     } catch (error) {
         console.error("Error exporting monthly report to Excel:", error);
-        throw error;
+        
     }
 };
 
@@ -42,6 +42,6 @@ export const exportDailyReportExcel = async (date) => {
         return response.data;
     } catch (error) {
         console.error("Error exporting daily report to Excel:", error);
-        throw error;
+        
     }
 };

@@ -14,6 +14,6 @@ export const getWorkLogs = async (dateFrom, dateTo) => {
         return response.data;
     } catch (error) {
         console.error("Error fetching work logs:", error);
-        throw error;
+        
     }
 };
