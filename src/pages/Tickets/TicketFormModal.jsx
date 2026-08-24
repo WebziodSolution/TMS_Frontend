@@ -239,8 +239,10 @@ const TicketFormModal = ({
                 payload.as_customer = true;
             }
             payload.owner_id = watch("owner_id") || null
-            delete payload.user_type;
+            payload.parent_ticket_id = watch("parent_ticket_id") || null
+            payload.department_id = watch("department_id") || null
 
+            delete payload.user_type;
             const selectedProject = projects.find(p => p.value === data.project_id);
             payload.project_name = selectedProject ? selectedProject.label : "";
 
