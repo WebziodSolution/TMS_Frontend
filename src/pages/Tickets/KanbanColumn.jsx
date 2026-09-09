@@ -1,18 +1,30 @@
+import { useState } from 'react';
 import { Droppable } from '@hello-pangea/dnd';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, IconButton, Tooltip } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faClipboardList, faSpinner, faEye, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faClose } from '@fortawesome/free-solid-svg-icons';
 import KanbanCard from './KanbanCard';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import PermissionWrapper from '../../components/permissionWrapper/PermissionWrapper';
 
 const getStatusIcon = (statusName) => {
     const name = statusName?.toLowerCase() || '';
-    // if (name.includes('todo') || name.includes('to do')) return faClipboardList;
-    // if (name.includes('progress')) return faSpinner;
-    // if (name.includes('review')) return faEye;
     if (name.includes('done') || name.includes('complete')) return faCheck;
 };
 
-const KanbanColumn = ({ status, tickets, onUpdateTitle, fetchTickets }) => {
+const KanbanColumn = ({
+    status,
+    tickets,
+    onUpdateTitle,
+    fetchTickets,
+    selectedTicketIds = [],
+    onToggleSelect,
+    onBulkClose
+}) => {
+    const [bulkCloseConfirmOpen, setBulkCloseConfirmOpen] = useState(false);
+
+    const selectedInColumn = tickets.filter(t => selectedTicketIds.includes(t.id));
+
     return (
         <Box
             sx={{
@@ -47,7 +59,6 @@ const KanbanColumn = ({ status, tickets, onUpdateTitle, fetchTickets }) => {
                     <Box sx={{
                         backgroundColor: '#EBECF0',
                         borderRadius: '4px',
-                        // p: 1,
                         p: 0.25,
                         minWidth: '20px',
                         textAlign: 'center'
@@ -56,6 +67,30 @@ const KanbanColumn = ({ status, tickets, onUpdateTitle, fetchTickets }) => {
                             {tickets.length}
                         </Typography>
                     </Box>
+
+                    {/* Show Close Ticket icon beside count when any ticket in this column is selected */}
+                    {selectedInColumn.length > 0 && status.name?.toLowerCase() !== 'close' && (
+                        <PermissionWrapper
+                            functionalityName="manage tickets"
+                            moduleName="Tickets"
+                            actionId={3}
+                            component={
+                                <Tooltip title={`Close ${selectedInColumn.length} selected ticket${selectedInColumn.length > 1 ? 's' : ''}`} arrow placement="bottom">
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => setBulkCloseConfirmOpen(true)}
+                                        sx={{
+                                            padding: '2px',
+                                            color: '#DE350B',
+                                            '&:hover': { backgroundColor: 'rgba(222, 53, 11, 0.1)' }
+                                        }}
+                                    >
+                                        <FontAwesomeIcon icon={faClose} size="xs" />
+                                    </IconButton>
+                                </Tooltip>
+                            }
+                        />
+                    )}
                 </Box>
                 {/* Visual indicator / Icon for the status */}
                 <Box sx={{ color: '#016630' }}>
@@ -98,12 +133,30 @@ const KanbanColumn = ({ status, tickets, onUpdateTitle, fetchTickets }) => {
                                 index={index}
                                 onUpdateTitle={onUpdateTitle}
                                 fetchTickets={fetchTickets}
+                                isSelected={selectedTicketIds.includes(ticket.id)}
+                                onToggleSelect={onToggleSelect}
                             />
                         ))}
                         {provided.placeholder}
                     </Box>
                 )}
             </Droppable>
+
+            <ConfirmDialog
+                open={bulkCloseConfirmOpen}
+                onClose={() => setBulkCloseConfirmOpen(false)}
+                onConfirm={() => {
+                    const ids = selectedInColumn.map(t => t.id);
+                    if (onBulkClose) {
+                        onBulkClose(ids, status.name);
+                    }
+                    setBulkCloseConfirmOpen(false);
+                }}
+                title="Close Tickets"
+                description={`Are you sure you want to close the selected ${selectedInColumn.length} ticket${selectedInColumn.length > 1 ? 's' : ''} in "${status.name}"?`}
+                confirmText="Close Tickets"
+                isDestructive={true}
+            />
         </Box>
     );
 };

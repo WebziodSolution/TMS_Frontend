@@ -4,7 +4,7 @@ import { Box, Typography, Button } from '@mui/material';
 import { connect } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { getAllStatuses } from '../../services/statusService';
-import { updateTicket, updateTicketStatus, updateTicketTitle } from '../../services/ticketService';
+import { updateTicket, updateTicketStatus, updateTicketTitle, bulkCloseTickets } from '../../services/ticketService';
 import { setAlert } from '../../redux/commonReducers/commonReducers';
 import KanbanColumn from './KanbanColumn';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -22,6 +22,8 @@ const KanbanBoard = ({ tickets, fetchTickets, setAlert, onAddTicket }) => {
     const [statuses, setStatuses] = useState([]);
     const [boardData, setBoardData] = useState({});
     const [openDialog, setOpenDialog] = useState(false);
+    const [selectedTicketIds, setSelectedTicketIds] = useState([]);
+
 
     // Verification Modal States
     const [openVerificationModal, setOpenVerificationModal] = useState(false);
@@ -179,6 +181,24 @@ const KanbanBoard = ({ tickets, fetchTickets, setAlert, onAddTicket }) => {
         }
     };
 
+    const handleToggleSelect = (ticketId) => {
+        setSelectedTicketIds(prev =>
+            prev.includes(ticketId) ? prev.filter(id => id !== ticketId) : [...prev, ticketId]
+        );
+    };
+
+    const handleBulkClose = async (ticketIdsToClose, statusName) => {
+        if (!ticketIdsToClose || ticketIdsToClose.length === 0) return;
+        try {
+            await bulkCloseTickets(ticketIdsToClose);
+            setAlert({ open: true, message: `${ticketIdsToClose.length} ticket${ticketIdsToClose.length > 1 ? 's' : ''} closed successfully!`, type: "success" });
+            setSelectedTicketIds(prev => prev.filter(id => !ticketIdsToClose.includes(id)));
+            fetchTickets();
+        } catch (err) {
+            setAlert({ open: true, message: err.message || "Failed to close tickets", type: "error" });
+        }
+    };
+
     return (
         <Box
             sx={{
@@ -206,8 +226,12 @@ const KanbanBoard = ({ tickets, fetchTickets, setAlert, onAddTicket }) => {
                             tickets={boardData[status.id] || []}
                             onUpdateTitle={handleUpdateTitle}
                             fetchTickets={fetchTickets}
+                            selectedTicketIds={selectedTicketIds}
+                            onToggleSelect={handleToggleSelect}
+                            onBulkClose={handleBulkClose}
                         />
                     ))}
+
 
                     {/* Add Column button placeholder if needed or just padding */}
                     <PermissionWrapper

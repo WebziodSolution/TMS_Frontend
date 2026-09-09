@@ -114,3 +114,13 @@ export const closeOrReopenTicket = async (ticketId, statusId = null) => {
         
     }
 };
+
+export const bulkCloseTickets = async (ticketIds) => {
+    try {
+        const response = await axiosInterceptor.post('/tickets/bulk-close', { ticket_ids: ticketIds });
+        return response.data;
+    } catch (error) {
+        console.error("Error bulk closing tickets:", error);
+        throw error;
+    }
+};

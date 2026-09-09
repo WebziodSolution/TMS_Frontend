@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Draggable } from '@hello-pangea/dnd';
-import { Box, Typography, IconButton, Tooltip, Avatar, AvatarGroup } from '@mui/material';
+import { Box, Typography, IconButton, Tooltip, Avatar, AvatarGroup, Checkbox } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faExclamationTriangle, faCalendarAlt, faCheckSquare, faTrash, faClose, faRotateLeft } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
@@ -31,7 +31,8 @@ const getTicketTypeColor = (type) => {
     return { bg: '#F4F5F7', text: '#5E6C84' };
 };
 
-const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert }) => {
+const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert, isSelected, onToggleSelect }) => {
+
     const userData = getUserDetails();
     const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
@@ -161,7 +162,9 @@ const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert }) =>
                             boxShadow: snapshot.isDragging
                                 ? '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)'
                                 : '0 1px 2px rgba(9, 30, 66, 0.25)',
-                            border: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '2px solid #FF5630' : '1px solid #dfe1e6',
+                            border: isSelected
+                                ? '2px solid #0052CC'
+                                : ((isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '2px solid #FF5630' : '1px solid #dfe1e6'),
                             transition: 'all 0.2s ease',
                             position: 'relative',
                             '&:hover': {
@@ -186,19 +189,46 @@ const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert }) =>
                                             color: '#172B4D',
                                             fontSize: '14px',
                                             lineHeight: '20px',
-                                            pr: 3,
+                                            pr: (isHovered || isSelected) ? 6 : 3,
                                             wordBreak: 'break-word',
                                             flex: 1
                                         }}
                                     >
                                         {ticket.title}
                                     </Typography>
-                                    {isHovered && (
+                                    {(isHovered || isSelected) && (
                                         <Box
                                             onClick={(e) => e.stopPropagation()}
                                             onMouseDown={(e) => e.stopPropagation()}
-                                            sx={{ position: 'absolute', right: 8, top: 12, display: 'flex', gap: 0.5 }}
+                                            sx={{ position: 'absolute', right: 8, top: 10, display: 'flex', alignItems: 'center', gap: 0.5, zIndex: 2 }}
                                         >
+                                            {ticket.status_name?.toLowerCase() !== 'close' && (
+                                                <PermissionWrapper
+                                                    functionalityName="manage tickets"
+                                                    moduleName="Tickets"
+                                                    actionId={3}
+                                                    component={
+                                                        <Tooltip title={isSelected ? "Deselect ticket" : "Select ticket"} arrow placement='bottom'>
+                                                            <Checkbox
+                                                                size="small"
+                                                                checked={!!isSelected}
+                                                                onChange={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onToggleSelect && onToggleSelect(ticket.id);
+                                                                }}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                sx={{
+                                                                    padding: '2px',
+                                                                    color: '#6B778C',
+                                                                    '&.Mui-checked': {
+                                                                        color: '#0052CC',
+                                                                    },
+                                                                }}
+                                                            />
+                                                        </Tooltip>
+                                                    }
+                                                />
+                                            )}
                                             <PermissionWrapper
                                                 functionalityName="manage tickets"
                                                 moduleName="Tickets"
@@ -233,6 +263,7 @@ const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert }) =>
                                         </Box>
                                     )}
                                 </Box>
+
 
                                 {/* Bottom row with ticket ID, due date, and assignees - now with flex wrap for better responsiveness */}
                                 <Box sx={{
