@@ -91,4 +91,21 @@ body,
   margin-top: 0.25rem !important;
   margin-bottom: 0.25rem !important;
 }
-  
+
+/* Ensure empty paragraphs in rich text content preserve spacing (e.g. Draft.js <p></p>) */
+.prose p:empty,
+.comment-content p:empty {
+  min-height: 1.25rem;
+  display: block;
+}
+
+.prose p:empty::before,
+.comment-content p:empty::before {
+  content: "\00a0";
+  display: inline-block;
+}
+
+.comment-content {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}

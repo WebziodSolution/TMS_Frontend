@@ -81,6 +81,11 @@ const CommentItem = ({ comment, ticketId, onCommentUpdated, currentUser, setLoad
         return dayjs(dateString).format("MMMM D, YYYY");
     };
 
+    const formatCommentContent = (content) => {
+        if (!content) return '';
+        return content.replace(/<p>(\s*|<br\s*\/?>)?<\/p>/gi, '<p><br /></p>');
+    };
+
     return (
         <div className="flex gap-4 group animate-fade-in py-4 border-b border-[#F4F5F7] last:border-0">
             <Avatar
@@ -141,8 +146,8 @@ const CommentItem = ({ comment, ticketId, onCommentUpdated, currentUser, setLoad
                 ) : (
                     <>
                         <div
-                            className="text-[#172B4D] prose prose-sm max-w-none comment-content"
-                            dangerouslySetInnerHTML={{ __html: comment.comment }}
+                            className="text-[#172B4D] prose prose-sm max-w-none comment-content break-words"
+                            dangerouslySetInnerHTML={{ __html: formatCommentContent(comment.comment) }}
                         />
 
                         {comment.attachments?.length > 0 && (

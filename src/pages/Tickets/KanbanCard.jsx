@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Draggable } from '@hello-pangea/dnd';
 import { Box, Typography, IconButton, Tooltip, Avatar, AvatarGroup, Checkbox } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faExclamationTriangle, faCalendarAlt, faCheckSquare, faTrash, faClose, faRotateLeft } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faExclamationTriangle, faCalendarAlt, faCheckSquare, faTrash, faClose, faRotateLeft, faArrowUp, faArrowDown, faMinus } from '@fortawesome/free-solid-svg-icons';
 import dayjs from 'dayjs';
 import InlineEdit from '../../components/common/InlineEdit';
 import TicketFormModal from './TicketFormModal';
@@ -29,6 +29,35 @@ const getTicketTypeColor = (type) => {
         return { bg: '#EAE6FF', text: '#403294' };
     }
     return { bg: '#F4F5F7', text: '#5E6C84' };
+};
+
+const getPriorityConfig = (priority) => {
+    const p = priority?.toLowerCase() || 'low';
+    if (p === 'high') {
+        return {
+            label: 'High',
+            color: '#BF2600',
+            bg: '#FFEBE6',
+            border: '#FFBDAD',
+            icon: faArrowUp
+        };
+    }
+    if (p === 'medium') {
+        return {
+            label: 'Medium',
+            color: '#974F00',
+            bg: '#FFF0B3',
+            border: '#FFE380',
+            icon: faMinus
+        };
+    }
+    return {
+        label: 'Low',
+        color: '#0052CC',
+        bg: '#DEEBFF',
+        border: '#B3D4FF',
+        icon: faArrowDown
+    };
 };
 
 const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert, isSelected, onToggleSelect }) => {
@@ -100,6 +129,7 @@ const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert, isSe
     const isOverdue = isValidDueDate &&
         dayjs(ticket.due_date).isBefore(dayjs(), 'day') &&
         ticket.status_name?.toLowerCase() !== 'done';
+    const priorityConfig = getPriorityConfig(ticket.priority);
 
     const handleSaveTitle = (newTitle) => {
         onUpdateTitle(ticket.id, newTitle);
@@ -304,84 +334,120 @@ const KanbanCard = ({ ticket, index, onUpdateTitle, fetchTickets, setAlert, isSe
                                         )}
                                     </Box>
 
-                                    {/* Due date and assignees container with wrapping support */}
+                                    {/* Bottom row with priority on left, and due date & assignees on right */}
                                     <Box sx={{
                                         display: 'flex',
                                         alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        width: '100%',
                                         gap: 1,
-                                        flexWrap: 'wrap',
-                                        justifyContent: 'flex-end',
-                                        flex: '1 1 auto',
-                                        minWidth: 0
+                                        mt: 0.5
                                     }}>
-                                        {/* Due date display with validation and proper styling */}
-                                        {ticket.due_date && dayjs(ticket.due_date).isValid() && (
-                                            <Box
-                                                sx={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: 0.5,
-                                                    padding: '2px 6px',
-                                                    borderRadius: '3px',
-                                                    backgroundColor: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '#FFEBE6' : 'transparent',
-                                                    color: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '#BF2600' : '#6B778C',
-                                                    border: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '1px solid #FF5630' : 'none',
-                                                    whiteSpace: 'nowrap',
-                                                    flexShrink: 0
-                                                }}
-                                            >
-                                                {(isOverdue && ticket.status_name?.toLowerCase() !== 'close') && <FontAwesomeIcon icon={faExclamationTriangle} size="xs" />}
-                                                <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '11px' }}>
-                                                    {formatDate(ticket.due_date)}
-                                                </Typography>
-                                            </Box>
+                                        {/* Priority Badge */}
+                                        {priorityConfig && (
+                                            <Tooltip title={`Priority: ${priorityConfig.label}`} arrow placement="top">
+                                                <Box
+                                                    sx={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 0.5,
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: priorityConfig.bg,
+                                                        color: priorityConfig.color,
+                                                        border: `1px solid ${priorityConfig.border}`,
+                                                        fontSize: '10px',
+                                                        fontWeight: 700,
+                                                        textTransform: 'uppercase',
+                                                        lineHeight: 1,
+                                                        flexShrink: 0
+                                                    }}
+                                                >
+                                                    <FontAwesomeIcon icon={priorityConfig.icon} style={{ fontSize: '9px' }} />
+                                                    <span>{priorityConfig.label}</span>
+                                                </Box>
+                                            </Tooltip>
                                         )}
 
-                                        {/* Fallback when no due date exists (optional) */}
-                                        {(!ticket.due_date || !dayjs(ticket.due_date).isValid()) && (
-                                            <Box
-                                                sx={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: 0.5,
-                                                    padding: '2px 6px',
-                                                    borderRadius: '3px',
-                                                    backgroundColor: '#F4F5F7',
-                                                    color: '#6B778C',
-                                                    whiteSpace: 'nowrap',
-                                                    flexShrink: 0
-                                                }}
-                                            >
-                                                <FontAwesomeIcon icon={faCalendarAlt} size="xs" />
-                                                <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '11px' }}>
-                                                    No due date
-                                                </Typography>
-                                            </Box>
-                                        )}
+                                        {/* Due date and assignees container with wrapping support */}
+                                        <Box sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1,
+                                            flexWrap: 'wrap',
+                                            justifyContent: 'flex-end',
+                                            flex: '1 1 auto',
+                                            minWidth: 0
+                                        }}>
+                                            {/* Due date display with validation and proper styling */}
+                                            {ticket.due_date && dayjs(ticket.due_date).isValid() && (
+                                                <Box
+                                                    sx={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 0.5,
+                                                        padding: '2px 6px',
+                                                        borderRadius: '3px',
+                                                        backgroundColor: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '#FFEBE6' : 'transparent',
+                                                        color: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '#BF2600' : '#6B778C',
+                                                        border: (isOverdue && ticket.status_name?.toLowerCase() !== 'close') ? '1px solid #FF5630' : 'none',
+                                                        whiteSpace: 'nowrap',
+                                                        flexShrink: 0
+                                                    }}
+                                                >
+                                                    {(isOverdue && ticket.status_name?.toLowerCase() !== 'close') && <FontAwesomeIcon icon={faExclamationTriangle} size="xs" />}
+                                                    <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '11px' }}>
+                                                        {formatDate(ticket.due_date)}
+                                                    </Typography>
+                                                </Box>
+                                            )}
 
-                                        {/* Assignees */}
-                                        {ticket.assignees?.length > 0 && (
-                                            <AvatarGroup max={2} sx={{
-                                                flexShrink: 0,
-                                                '& .MuiAvatar-root': {
-                                                    width: 24,
-                                                    height: 24,
-                                                    fontSize: '10px',
-                                                    border: '2px solid white'
-                                                }
-                                            }}>
-                                                {ticket.assignees.map((user, idx) => (
-                                                    <Tooltip key={idx} title={user.name}>
-                                                        <Avatar
-                                                            alt={user.name}
-                                                            sx={{ bgcolor: '#00A3BF' }}
-                                                        >
-                                                            {user.name.charAt(0).toUpperCase()}
-                                                        </Avatar>
-                                                    </Tooltip>
-                                                ))}
-                                            </AvatarGroup>
-                                        )}
+                                            {/* Fallback when no due date exists (optional) */}
+                                            {(!ticket.due_date || !dayjs(ticket.due_date).isValid()) && (
+                                                <Box
+                                                    sx={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 0.5,
+                                                        padding: '2px 6px',
+                                                        borderRadius: '3px',
+                                                        backgroundColor: '#F4F5F7',
+                                                        color: '#6B778C',
+                                                        whiteSpace: 'nowrap',
+                                                        flexShrink: 0
+                                                    }}
+                                                >
+                                                    <FontAwesomeIcon icon={faCalendarAlt} size="xs" />
+                                                    <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '11px' }}>
+                                                        No due date
+                                                    </Typography>
+                                                </Box>
+                                            )}
+
+                                            {/* Assignees */}
+                                            {ticket.assignees?.length > 0 && (
+                                                <AvatarGroup max={2} sx={{
+                                                    flexShrink: 0,
+                                                    '& .MuiAvatar-root': {
+                                                        width: 24,
+                                                        height: 24,
+                                                        fontSize: '10px',
+                                                        border: '2px solid white'
+                                                    }
+                                                }}>
+                                                    {ticket.assignees.map((user, idx) => (
+                                                        <Tooltip key={idx} title={user.name}>
+                                                            <Avatar
+                                                                alt={user.name}
+                                                                sx={{ bgcolor: '#00A3BF' }}
+                                                            >
+                                                                {user.name.charAt(0).toUpperCase()}
+                                                            </Avatar>
+                                                        </Tooltip>
+                                                    ))}
+                                                </AvatarGroup>
+                                            )}
+                                        </Box>
                                     </Box>
                                 </Box>
                             </Box>

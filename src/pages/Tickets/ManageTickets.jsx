@@ -275,6 +275,9 @@ const ManageTickets = ({ setAlert }) => {
                                             Status
                                         </th>
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-[#8993A4] uppercase tracking-wider">
+                                            Priority
+                                        </th>
+                                        <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-[#8993A4] uppercase tracking-wider">
                                             Due Date
                                         </th>
                                         <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-[#8993A4] uppercase tracking-wider w-24">
@@ -358,6 +361,19 @@ const ManageTickets = ({ setAlert }) => {
                                                 {ticket.status_name ? (
                                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E9F2FF] text-[#0052CC]">
                                                         {ticket.status_name}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-[#8993A4]">-</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                {ticket.priority ? (
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                                                        ticket.priority?.toLowerCase() === 'high' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                                        ticket.priority?.toLowerCase() === 'medium' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                        'bg-slate-50 text-slate-700 border-slate-200'
+                                                    }`}>
+                                                        {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1).toLowerCase()}
                                                     </span>
                                                 ) : (
                                                     <span className="text-xs text-[#8993A4]">-</span>
